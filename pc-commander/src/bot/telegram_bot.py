@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import os
 import threading
 import time
@@ -11,10 +12,12 @@ from src.utils.logger import get_logger, log_command
 from src.bot.commands import execute_command
 from src.utils.security_auth import (
     check_authorization, request_pin_auth, verify_pin,
-    is_waiting_pin
+    is_waiting_pin, refresh_session
 )
 
 logger = get_logger()
+
+MAX_USERS_CONTEXT = 100
 
 QUICK_COMMANDS_AR = [
     ["📸 لقطة شاشة", "screenshot"],
@@ -33,14 +36,10 @@ class PCCommanderBot:
         self.ai_handler = ai_handler
         self.config = config
         self.app = None
-        self.conversation_context: dict[int, list] = {}
+        self.conversation_context: collections.OrderedDict[int, list] = collections.OrderedDict()
         self.last_activity: dict[int, float] = {}
         self._running = False
         self._thread = None
-
-    # ------------------------------------------------------------------
-    # Authorization helpers
-    # ------------------------------------------------------------------
 
     def is_authorized(self, user_id: int) -> bool:
         """Return True if user_id is in the allowed list (internal helper only)."""
@@ -87,10 +86,6 @@ class PCCommanderBot:
             return False
         return True
 
-    # ------------------------------------------------------------------
-    # Shared text-processing core (FIX-9)
-    # ------------------------------------------------------------------
-
     async def _process_text(
         self,
         user_id: int,
@@ -103,6 +98,7 @@ class PCCommanderBot:
         Centralised here so handle_text and handle_voice share the same logic.
         """
         self.last_activity[user_id] = time.time()
+        refresh_session(user_id)
 
         if self.config.get("general", {}).get("do_not_disturb", False):
             await update.message.reply_text(
@@ -122,7 +118,12 @@ class PCCommanderBot:
 
             ctx.append({"role": "user", "content": text})
             ctx.append({"role": "assistant", "content": ai_response})
+
             self.conversation_context[user_id] = ctx[-10:]
+            self.conversation_context.move_to_end(user_id)
+
+            if len(self.conversation_context) > MAX_USERS_CONTEXT:
+                self.conversation_context.popitem(last=False)
 
             if command != "chat":
                 result_text, result_file = execute_command(command, args, self.config)
@@ -154,10 +155,6 @@ class PCCommanderBot:
         except Exception as e:
             logger.error(f"Error processing message: {e}")
             await update.message.reply_text(f"❌ حدث خطأ: {e}")
-
-    # ------------------------------------------------------------------
-    # Command handlers
-    # ------------------------------------------------------------------
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await self._check_auth_and_session(update):
@@ -210,7 +207,6 @@ class PCCommanderBot:
         user_id = update.effective_user.id
         text = update.message.text
 
-        # PIN verification flow takes priority
         if is_waiting_pin(user_id):
             result = verify_pin(user_id, text, self.config)
             try:
@@ -261,7 +257,6 @@ class PCCommanderBot:
                 f"🎤 سمعتك: _{transcribed_text}_", parse_mode="Markdown"
             )
 
-            # Pass transcribed text directly — never mutate update.message.text (FIX-9)
             await self._process_text(user_id, transcribed_text, update, context)
 
         except Exception as e:
@@ -338,10 +333,6 @@ class PCCommanderBot:
                 notifier = WoLNotifier(bot=self, config=self.config)
                 notifier.notify_async(query.from_user.id)
 
-    # ------------------------------------------------------------------
-    # Notifications
-    # ------------------------------------------------------------------
-
     async def send_notification(self, message: str):
         """Send a message to all allowed users."""
         if not self.app or not self.allowed_users:
@@ -351,10 +342,6 @@ class PCCommanderBot:
                 await self.app.bot.send_message(uid, message, parse_mode="Markdown")
             except Exception as e:
                 logger.error(f"Failed to send notification: {e}")
-
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
 
     def start(self):
         """Start the bot in a background thread."""
@@ -427,16 +414,12 @@ class PCCommanderBot:
             except Exception as e:
                 logger.warning(f"Bot stop warning: {e}")
 
-    # ------------------------------------------------------------------
-    # Context TTL cleanup (FIX-13)
-    # ------------------------------------------------------------------
-
     def _start_context_cleanup(self) -> None:
-        """Start a background thread that removes idle conversation contexts."""
+        """Start a background thread that removes idle conversation contexts hourly."""
         def _cleanup_loop():
-            idle_cutoff = 7200  # 2 hours in seconds
+            idle_cutoff = 7200
             while self._running:
-                time.sleep(1800)  # run every 30 minutes
+                time.sleep(3600)
                 now = time.time()
                 to_remove = [
                     uid for uid, last in self.last_activity.items()

@@ -1,3 +1,4 @@
+import secrets
 from src.utils.logger import get_logger
 
 logger = get_logger()
@@ -11,7 +12,7 @@ class PCCommanderService:
         self.scheduler = None
         self.network_monitor = None
         self.server_thread = None
-        self.ai_handler = None  # FIX-12: initialise before _start_ai()
+        self.ai_handler = None
         self._ssh_executor = None
         self._running = False
 
@@ -25,8 +26,9 @@ class PCCommanderService:
             self._start_server()
             self._start_tunnel()
             self._start_ai()
-            self._wire_vision_handler()  # FIX-3: share VisionHandler with commands
-            self._wire_ssh_executor()   # SSH Layer 2: share SSHExecutor with commands
+            self._wire_vision_handler()
+            self._wire_ssh_executor()
+            self._ensure_stream_password()
             self._start_bot()
             self._start_scheduler()
             self._start_network_monitor()
@@ -38,7 +40,6 @@ class PCCommanderService:
 
     def _start_server(self):
         from src.server.http_server import start_server, set_secret_token
-        import secrets
         token = secrets.token_urlsafe(16)
         set_secret_token(token)
         self.server_thread = start_server(port=5000)
@@ -79,7 +80,7 @@ class PCCommanderService:
         logger.info(f"AI provider: {provider}")
 
     def _wire_vision_handler(self):
-        """Share a single VisionHandler instance with the commands module (FIX-3)."""
+        """Share a single VisionHandler instance with the commands module."""
         try:
             from src.bot.commands import set_vision_handler
             from src.ai.vision_handler import VisionHandler
@@ -111,6 +112,49 @@ class PCCommanderService:
         except Exception as e:
             logger.warning(f"SSHExecutor not wired (non-fatal): {e}")
 
+    def _ensure_stream_password(self):
+        """
+        If stream is enabled and no password is set, generate a random one
+        and schedule a one-time notification to the owner via Telegram.
+        """
+        stream_cfg = self.config.get("stream", {})
+        if not stream_cfg.get("enabled", False):
+            return
+
+        password = stream_cfg.get("password", "")
+        if not password:
+            new_password = secrets.token_urlsafe(12)
+            self.config["stream"]["password"] = new_password
+            logger.info("Stream password was empty — generated a random password.")
+
+            from src.utils.config import save_config
+            try:
+                save_config(self.config)
+            except Exception as e:
+                logger.warning(f"Could not persist generated stream password: {e}")
+
+            self._pending_stream_password_notice = new_password
+        else:
+            self._pending_stream_password_notice = None
+
+    def _notify_stream_password(self, password: str):
+        """Send the auto-generated stream password to all allowed users once."""
+        if not self.bot:
+            return
+        import asyncio
+        message = (
+            "🔐 **كلمة مرور البث العشوائية**\n\n"
+            f"`{password}`\n\n"
+            "⚠️ احفظها — لن تُرسل مرة أخرى.\n"
+            "يمكنك تغييرها من الإعدادات."
+        )
+        try:
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(self.bot.send_notification(message))
+            loop.close()
+        except Exception as e:
+            logger.error(f"Failed to notify stream password: {e}")
+
     def _start_bot(self):
         from src.bot.telegram_bot import PCCommanderBot
         self.bot = PCCommanderBot(
@@ -121,6 +165,17 @@ class PCCommanderService:
         )
         self.bot.start()
         logger.info("Telegram bot started")
+
+        notice = getattr(self, "_pending_stream_password_notice", None)
+        if notice:
+            import threading
+            import time
+
+            def _delayed_notify():
+                time.sleep(5)
+                self._notify_stream_password(notice)
+
+            threading.Thread(target=_delayed_notify, daemon=True).start()
 
     def _start_scheduler(self):
         from src.scheduler.task_scheduler import TaskScheduler

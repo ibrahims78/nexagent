@@ -1,9 +1,10 @@
 import os
+from src.pc_control.command_whitelist import validate_command
+from src.utils.logger import get_logger
 
-# Shared VisionHandler instance injected by main_service (FIX-3)
+logger = get_logger()
+
 _vision_handler = None
-
-# Shared SSHExecutor instance injected by main_service (SSH Layer 2)
 _ssh_executor = None
 
 
@@ -28,6 +29,11 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
         screenshot, process_manager, file_manager,
         word_handler, system_monitor, anydesk
     )
+
+    valid, reason = validate_command(command, args)
+    if not valid:
+        logger.warning(f"Command rejected by whitelist: '{command}' args={args} reason={reason}")
+        return reason, None
 
     result_text = ""
     result_file = None
@@ -130,10 +136,6 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
         elif command == "wol_status":
             result_text = _wol_check_status(config)
 
-        # ------------------------------------------------------------------
-        # Vision commands — use the shared _vision_handler (FIX-3)
-        # ------------------------------------------------------------------
-
         elif command == "vision_do":
             if _vision_handler is None:
                 result_text = "❌ التحكم البصري غير مهيأ. تحقق من مزود الذكاء الاصطناعي."
@@ -190,10 +192,6 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
                     "🔄 **مهمة ذكية متعددة الخطوات:**\n\n"
                     + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
                 )
-
-        # ------------------------------------------------------------------
-        # System / security commands
-        # ------------------------------------------------------------------
 
         elif command == "autologon_enable":
             username = args[0] if len(args) > 0 else ""
@@ -302,10 +300,6 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
         elif command == "chat":
             result_text = args[0] if args else ""
 
-        # ------------------------------------------------------------------
-        # SSH Layer 2 commands — routed through SSHExecutor
-        # ------------------------------------------------------------------
-
         elif command == "ssh_exec":
             if _ssh_executor is None:
                 result_text = "❌ SSH غير مهيأ. تحقق من إعدادات [ssh] في النظام."
@@ -389,10 +383,6 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
 
     return result_text, result_file
 
-
-# ------------------------------------------------------------------
-# Internal helpers
-# ------------------------------------------------------------------
 
 def _wol_check_status(config: dict) -> str:
     """Ping the PC on port 445 to determine if it is online."""

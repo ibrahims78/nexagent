@@ -6,10 +6,32 @@ from datetime import datetime
 
 IS_WINDOWS = sys.platform == "win32"
 
+ALLOWED_BASE_PATHS: list = [
+    os.path.expanduser("~"),
+    os.path.join(os.path.expanduser("~"), "Desktop"),
+    os.path.join(os.path.expanduser("~"), "Documents"),
+    os.path.join(os.path.expanduser("~"), "Downloads"),
+    os.path.join(os.path.expanduser("~"), "Pictures"),
+]
+
+
+def is_safe_path(path: str) -> bool:
+    """Return True only if path resolves inside one of ALLOWED_BASE_PATHS."""
+    try:
+        resolved = Path(path).resolve()
+        return any(
+            resolved == base or base in resolved.parents
+            for base in [Path(p).resolve() for p in ALLOWED_BASE_PATHS]
+        )
+    except Exception:
+        return False
+
 
 def list_directory(path: str = None) -> str:
     if path is None:
         path = os.path.expanduser("~")
+    if not is_safe_path(path):
+        return f"❌ الوصول مرفوض: المسار خارج النطاق المسموح به: {path}"
     try:
         p = Path(path)
         if not p.exists():
@@ -28,6 +50,8 @@ def list_directory(path: str = None) -> str:
 
 
 def delete_file(path: str) -> str:
+    if not is_safe_path(path):
+        return f"❌ الوصول مرفوض: المسار خارج النطاق المسموح به: {path}"
     try:
         p = Path(path)
         if not p.exists():
@@ -42,6 +66,8 @@ def delete_file(path: str) -> str:
 
 
 def create_folder(path: str) -> str:
+    if not is_safe_path(path):
+        return f"❌ الوصول مرفوض: المسار خارج النطاق المسموح به: {path}"
     try:
         Path(path).mkdir(parents=True, exist_ok=True)
         return f"✅ تم إنشاء المجلد: {path}"
@@ -50,6 +76,10 @@ def create_folder(path: str) -> str:
 
 
 def copy_file(src: str, dst: str) -> str:
+    if not is_safe_path(src):
+        return f"❌ الوصول مرفوض: المسار المصدر خارج النطاق المسموح به: {src}"
+    if not is_safe_path(dst):
+        return f"❌ الوصول مرفوض: المسار الهدف خارج النطاق المسموح به: {dst}"
     try:
         shutil.copy2(src, dst)
         return f"✅ تم نسخ: {src} → {dst}"
@@ -58,6 +88,10 @@ def copy_file(src: str, dst: str) -> str:
 
 
 def move_file(src: str, dst: str) -> str:
+    if not is_safe_path(src):
+        return f"❌ الوصول مرفوض: المسار المصدر خارج النطاق المسموح به: {src}"
+    if not is_safe_path(dst):
+        return f"❌ الوصول مرفوض: المسار الهدف خارج النطاق المسموح به: {dst}"
     try:
         shutil.move(src, dst)
         return f"✅ تم نقل: {src} → {dst}"
@@ -66,6 +100,8 @@ def move_file(src: str, dst: str) -> str:
 
 
 def get_file_info(path: str) -> str:
+    if not is_safe_path(path):
+        return f"❌ الوصول مرفوض: المسار خارج النطاق المسموح به: {path}"
     try:
         p = Path(path)
         if not p.exists():
@@ -83,6 +119,8 @@ def get_file_info(path: str) -> str:
 
 
 def search_files(folder: str, pattern: str) -> str:
+    if not is_safe_path(folder):
+        return f"❌ الوصول مرفوض: المسار خارج النطاق المسموح به: {folder}"
     try:
         p = Path(folder)
         results = list(p.rglob(pattern))[:20]
@@ -102,6 +140,8 @@ def _human_size(size: int) -> str:
 
 
 def open_file(path: str) -> str:
+    if not is_safe_path(path):
+        return f"❌ الوصول مرفوض: المسار خارج النطاق المسموح به: {path}"
     try:
         if IS_WINDOWS:
             os.startfile(path)

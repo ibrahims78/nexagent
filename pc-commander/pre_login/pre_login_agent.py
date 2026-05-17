@@ -3,6 +3,10 @@
 PC Commander - Pre-Login Agent
 سكريبت يعمل عند إقلاع ويندوز قبل/عند شاشة تسجيل الدخول
 يُرسل إشعاراً على تيليغرام ويستقبل أمر تسجيل الدخول
+
+⚠️ تحذير أمني: يتطلب هذا العميل إرسال كلمة مرور عبر تيليغرام.
+استخدمه فقط إذا كنت تثق تماماً بقناة تيليغرام وبالأجهزة التي تستخدمها.
+هذه الميزة مخصصة للاستخدام المتقدم فقط.
 """
 
 import asyncio
@@ -51,6 +55,15 @@ def load_config() -> dict:
     return DEFAULT_CONFIG.copy()
 
 
+def _build_security_config(config: dict) -> dict:
+    """Wrap pre_login config into the shape expected by is_allowed_user."""
+    return {
+        "telegram": {
+            "allowed_users": config.get("allowed_users", [])
+        }
+    }
+
+
 def is_internet_available(timeout: int = 5) -> bool:
     for _ in range(10):
         try:
@@ -89,15 +102,28 @@ def simulate_login_keystrokes(password: str):
 
 async def run_pre_login_bot(config: dict):
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-    from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+    from telegram.ext import (
+        Application, CommandHandler, MessageHandler,
+        CallbackQueryHandler, filters, ContextTypes
+    )
+
+    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+    try:
+        from utils.security_auth import is_allowed_user
+        security_config = _build_security_config(config)
+
+        def is_allowed(uid: int) -> bool:
+            return is_allowed_user(uid, security_config)
+    except ImportError:
+        allowed_users_list = [int(u) for u in config.get("allowed_users", []) if str(u).strip()]
+
+        def is_allowed(uid: int) -> bool:
+            return not allowed_users_list or uid in allowed_users_list
 
     login_event = asyncio.Event()
     login_password = [None]
 
     allowed_users = [int(u) for u in config.get("allowed_users", []) if str(u).strip()]
-
-    def is_allowed(uid: int) -> bool:
-        return not allowed_users or uid in allowed_users
 
     async def send_boot_notification(app):
         hostname = socket.gethostname()
@@ -188,12 +214,16 @@ async def run_pre_login_bot(config: dict):
         await app.shutdown()
 
         if login_event.is_set() and login_password[0]:
-            log(f"🔓 محاولة تسجيل الدخول...")
+            log("🔓 محاولة تسجيل الدخول...")
             success = simulate_login_keystrokes(login_password[0])
             if success:
                 for uid in allowed_users:
                     try:
-                        await app.bot.send_message(uid, "✅ **تم تسجيل الدخول بنجاح!**\nالبوت الرئيسي يعمل الآن.", parse_mode="Markdown")
+                        await app.bot.send_message(
+                            uid,
+                            "✅ **تم تسجيل الدخول بنجاح!**\nالبوت الرئيسي يعمل الآن.",
+                            parse_mode="Markdown"
+                        )
                     except Exception:
                         pass
             else:

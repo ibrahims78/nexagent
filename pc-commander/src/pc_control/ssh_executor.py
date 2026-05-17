@@ -4,6 +4,8 @@ Connects to the local OpenSSH server (127.0.0.1:22) that is exposed
 via the SshRemote bore tunnel.  Provides exec, SFTP upload/download,
 and directory listing through a persistent Paramiko client.
 """
+import base64
+import hashlib
 import io
 import threading
 from pathlib import Path
@@ -11,10 +13,78 @@ from src.utils.logger import get_logger
 
 logger = get_logger()
 
-# Default connection parameters — match sshremote_config.ini
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 22
-_DEFAULT_TIMEOUT = 15  # seconds
+_DEFAULT_TIMEOUT = 15
+
+
+def _get_known_hosts_file() -> Path:
+    from src.utils.config import get_config_dir
+    return get_config_dir() / "known_hosts.json"
+
+
+def _load_known_hosts() -> dict:
+    kh_file = _get_known_hosts_file()
+    if kh_file.exists():
+        import json
+        try:
+            with open(kh_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _save_known_hosts(known_hosts: dict):
+    import json
+    kh_file = _get_known_hosts_file()
+    with open(kh_file, "w", encoding="utf-8") as f:
+        json.dump(known_hosts, f, indent=2)
+
+
+def _fingerprint(key) -> str:
+    key_bytes = key.asbytes()
+    digest = hashlib.sha256(key_bytes).digest()
+    return "SHA256:" + base64.b64encode(digest).rstrip(b"=").decode()
+
+
+class TOFUPolicy:
+    """
+    Trust On First Use host key policy.
+    - First connection: stores the fingerprint and accepts it.
+    - Subsequent connections: rejects if fingerprint changed (MITM protection).
+    """
+
+    def __init__(self, host: str, port: int):
+        self._host_key = f"{host}:{port}"
+        self._known_hosts = _load_known_hosts()
+
+    def missing_host_key(self, client, hostname, key):
+        import paramiko
+        fp = _fingerprint(key)
+        stored = self._known_hosts.get(self._host_key)
+
+        if stored is None:
+            logger.info(
+                f"SSH TOFU: First connection to {self._host_key} — "
+                f"storing fingerprint {fp}"
+            )
+            self._known_hosts[self._host_key] = fp
+            _save_known_hosts(self._known_hosts)
+            return
+
+        if stored != fp:
+            logger.error(
+                f"SSH HOST KEY MISMATCH for {self._host_key}! "
+                f"Expected {stored}, got {fp}. Possible MITM attack."
+            )
+            raise paramiko.SSHException(
+                f"Host key verification failed for {self._host_key}. "
+                "Fingerprint does not match stored value. "
+                "If the server key changed legitimately, remove the entry from known_hosts.json."
+            )
+
+        logger.debug(f"SSH host key verified for {self._host_key}: {fp}")
 
 
 class SSHExecutor:
@@ -46,16 +116,12 @@ class SSHExecutor:
         self._client = None
         self._lock = threading.Lock()
 
-    # ------------------------------------------------------------------
-    # Connection lifecycle
-    # ------------------------------------------------------------------
-
     def connect(self) -> None:
-        """Open an SSH connection to the local server."""
+        """Open an SSH connection to the local server using TOFU host key policy."""
         import paramiko
 
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.set_missing_host_key_policy(TOFUPolicy(self._host, self._port))
 
         kwargs = dict(
             hostname=self._host,
@@ -98,10 +164,6 @@ class SSHExecutor:
                 self.close()
                 self.connect()
 
-    # ------------------------------------------------------------------
-    # Command execution
-    # ------------------------------------------------------------------
-
     def exec_command(self, cmd: str, timeout: int = 30) -> str:
         """
         Execute a shell command on the local machine via SSH.
@@ -122,15 +184,8 @@ class SSHExecutor:
                 logger.error(f"SSH exec_command error: {e}")
                 return f"❌ SSH error: {e}"
 
-    # ------------------------------------------------------------------
-    # SFTP operations
-    # ------------------------------------------------------------------
-
     def upload_file(self, local_path: str, remote_path: str) -> str:
-        """
-        Upload a local file to the remote path via SFTP.
-        Returns a status string.
-        """
+        """Upload a local file to the remote path via SFTP."""
         with self._lock:
             self._ensure_connected()
             try:
@@ -145,10 +200,7 @@ class SSHExecutor:
                 return f"❌ فشل رفع الملف: {e}"
 
     def download_file(self, remote_path: str) -> bytes:
-        """
-        Download a remote file and return its contents as bytes.
-        Returns None on failure.
-        """
+        """Download a remote file and return its contents as bytes."""
         with self._lock:
             self._ensure_connected()
             try:
@@ -164,9 +216,7 @@ class SSHExecutor:
                 return None
 
     def list_files(self, remote_path: str = ".") -> str:
-        """
-        Return a formatted directory listing of the remote path.
-        """
+        """Return a formatted directory listing of the remote path."""
         with self._lock:
             self._ensure_connected()
             try:
@@ -191,10 +241,7 @@ class SSHExecutor:
                 return f"❌ فشل عرض الملفات: {e}"
 
     def get_tunnel_port(self, port_file: str = r"C:\SshRemote_V2\bore_port.txt") -> str:
-        """
-        Read the bore port from the port file written by sshremote_tunnel_v2.ps1.
-        Returns the port number as a string or an error message.
-        """
+        """Read the bore port from the port file."""
         result = self.exec_command(f'type "{port_file}"', timeout=5)
         port = result.strip()
         if port.isdigit():
@@ -226,10 +273,6 @@ class SSHExecutor:
                 "🔴 **النفق متوقف**\n\n"
                 "شغّل `setup_v2.bat` أو `start_tunnel_v2.bat` لتفعيله."
             )
-
-    # ------------------------------------------------------------------
-    # Context manager support
-    # ------------------------------------------------------------------
 
     def __enter__(self):
         self.connect()

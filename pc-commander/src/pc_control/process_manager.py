@@ -1,3 +1,4 @@
+import shlex
 import subprocess
 import sys
 import psutil
@@ -5,11 +6,46 @@ import os
 
 IS_WINDOWS = sys.platform == "win32"
 
+ALLOWED_COMMANDS: set = {
+    "shutdown", "restart", "screenshot", "system_status", "list_processes",
+    "list_files", "run_command", "open_application", "close_application",
+    "lock_screen", "volume", "anydesk", "daily_report", "cancel_shutdown",
+}
+
+DANGEROUS_EXTENSIONS = {".bat", ".ps1", ".vbs", ".cmd"}
+
+SAFE_APPS: set = {
+    "notepad", "notepad.exe",
+    "calc", "calc.exe",
+    "explorer", "explorer.exe",
+    "mspaint", "mspaint.exe",
+    "wordpad", "wordpad.exe",
+    "chrome", "chrome.exe",
+    "firefox", "firefox.exe",
+    "msedge", "msedge.exe",
+    "code", "code.exe",
+    "anydesk", "anydesk.exe",
+    "taskmgr", "taskmgr.exe",
+}
+
 
 def open_application(app_name: str) -> str:
+    if not app_name:
+        return "❌ لم يتم تحديد اسم التطبيق"
+
+    name_lower = app_name.lower().strip()
+    base_name = os.path.basename(name_lower)
+
+    ext = os.path.splitext(base_name)[1]
+    if ext in DANGEROUS_EXTENSIONS:
+        return f"❌ نوع الملف غير مسموح به للفتح: {ext}"
+
+    if base_name not in SAFE_APPS and name_lower not in SAFE_APPS:
+        return f"❌ التطبيق '{app_name}' غير موجود في قائمة التطبيقات المسموح بها"
+
     try:
         if IS_WINDOWS:
-            os.startfile(app_name)
+            subprocess.Popen([app_name], shell=False)
         else:
             subprocess.Popen(["xdg-open", app_name])
         return f"✅ تم فتح: {app_name}"
@@ -45,8 +81,9 @@ def list_running_processes() -> str:
 
 def run_command(command: str) -> str:
     try:
+        args = shlex.split(command)
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=30,
+            args, shell=False, capture_output=True, text=True, timeout=30,
             encoding="utf-8", errors="replace"
         )
         output = result.stdout or result.stderr or "✅ تم تنفيذ الأمر"
@@ -59,23 +96,23 @@ def run_command(command: str) -> str:
 
 def shutdown_pc(delay_minutes: int = 0) -> str:
     if IS_WINDOWS:
-        os.system(f"shutdown /s /t {delay_minutes * 60}")
+        subprocess.run(["shutdown", "/s", "/t", str(delay_minutes * 60)], check=False)
     else:
-        os.system(f"shutdown -h +{delay_minutes}")
+        subprocess.run(["shutdown", "-h", f"+{delay_minutes}"], check=False)
     return f"✅ سيتم إغلاق الحاسب {'الآن' if delay_minutes == 0 else f'بعد {delay_minutes} دقيقة'}"
 
 
 def restart_pc(delay_minutes: int = 0) -> str:
     if IS_WINDOWS:
-        os.system(f"shutdown /r /t {delay_minutes * 60}")
+        subprocess.run(["shutdown", "/r", "/t", str(delay_minutes * 60)], check=False)
     else:
-        os.system(f"shutdown -r +{delay_minutes}")
+        subprocess.run(["shutdown", "-r", f"+{delay_minutes}"], check=False)
     return f"✅ سيتم إعادة تشغيل الحاسب {'الآن' if delay_minutes == 0 else f'بعد {delay_minutes} دقيقة'}"
 
 
 def cancel_shutdown() -> str:
     if IS_WINDOWS:
-        os.system("shutdown /a")
+        subprocess.run(["shutdown", "/a"], check=False)
     return "✅ تم إلغاء إيقاف التشغيل"
 
 
@@ -99,6 +136,10 @@ def set_volume(level: int) -> str:
             volume.SetMasterVolumeLevelScalar(level / 100, None)
             return f"✅ تم ضبط الصوت على {level}%"
         except Exception:
-            os.system("powershell -c \"(New-Object -com Shell.Application).sendkeys([char]174)\"")
+            subprocess.run(
+                ["powershell", "-c",
+                 "(New-Object -com Shell.Application).sendkeys([char]174)"],
+                check=False
+            )
             return "✅ تم تعديل الصوت"
     return "❌ هذه الميزة متاحة على ويندوز فقط"

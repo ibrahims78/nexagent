@@ -2,11 +2,13 @@
 PC Commander - Security & Authorization
 طبقات الأمان: User ID + PIN + Session + Rate Limiting
 """
+import json
 import time
 import hashlib
 import secrets
 import threading
 from collections import defaultdict
+from pathlib import Path
 from src.utils.logger import get_logger
 
 logger = get_logger()
@@ -18,10 +20,43 @@ _blocked_users: set[int] = set()
 _lock = threading.Lock()
 
 SESSION_TIMEOUT    = 3600
+IDLE_TIMEOUT       = 1800
 PIN_TIMEOUT        = 120
 RATE_LIMIT_WINDOW  = 60
 RATE_LIMIT_MAX     = 30
 MAX_PIN_ATTEMPTS   = 3
+
+
+def _get_state_file() -> Path:
+    from src.utils.config import get_config_dir
+    return get_config_dir() / "security_state.json"
+
+
+def _load_state():
+    """Load persisted security state (blocked users) from disk on startup."""
+    global _blocked_users
+    state_file = _get_state_file()
+    if state_file.exists():
+        try:
+            with open(state_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            _blocked_users = set(int(u) for u in data.get("blocked_users", []))
+            logger.info(f"Security state loaded: {len(_blocked_users)} blocked user(s)")
+        except Exception as e:
+            logger.warning(f"Failed to load security state: {e}")
+
+
+def _save_state():
+    """Persist the current blocked users list to disk."""
+    try:
+        state_file = _get_state_file()
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump({"blocked_users": list(_blocked_users)}, f)
+    except Exception as e:
+        logger.warning(f"Failed to save security state: {e}")
+
+
+_load_state()
 
 
 def _hash_pin(pin: str) -> str:
@@ -52,11 +87,13 @@ def is_blocked(user_id: int) -> bool:
 
 def block_user(user_id: int):
     _blocked_users.add(user_id)
+    _save_state()
     logger.warning(f"🚫 تم حجب المستخدم: {user_id}")
 
 
 def unblock_user(user_id: int):
     _blocked_users.discard(user_id)
+    _save_state()
     logger.info(f"✅ تم رفع الحجب عن: {user_id}")
 
 
@@ -69,7 +106,11 @@ def is_session_valid(user_id: int, config: dict) -> bool:
         session = _sessions.get(user_id)
         if not session:
             return False
-        if time.time() - session["created_at"] > SESSION_TIMEOUT:
+        now = time.time()
+        if now - session["created_at"] > SESSION_TIMEOUT:
+            del _sessions[user_id]
+            return False
+        if now - session.get("last_activity", session["created_at"]) > IDLE_TIMEOUT:
             del _sessions[user_id]
             return False
         return True
@@ -77,10 +118,20 @@ def is_session_valid(user_id: int, config: dict) -> bool:
 
 def create_session(user_id: int):
     with _lock:
+        now = time.time()
         _sessions[user_id] = {
-            "created_at": time.time(),
+            "created_at": now,
+            "last_activity": now,
             "token": secrets.token_hex(16)
         }
+
+
+def refresh_session(user_id: int):
+    """Update last_activity timestamp to keep the session alive."""
+    with _lock:
+        session = _sessions.get(user_id)
+        if session:
+            session["last_activity"] = time.time()
 
 
 def invalidate_session(user_id: int):
@@ -145,7 +196,6 @@ def check_authorization(user_id: int, config: dict) -> tuple[bool, str]:
     2. هل هو محجوب؟
     3. هل تجاوز حد الطلبات؟
     4. هل لديه جلسة نشطة (إذا كان PIN مفعّلاً)؟
-    يُرجع: (مسموح: bool, سبب الرفض: str)
     """
     if not is_allowed_user(user_id, config):
         logger.warning(f"⛔ محاولة وصول غير مصرّح به: {user_id}")
@@ -177,7 +227,8 @@ def get_security_report(config: dict) -> str:
         f"🔑 رمز PIN: {'✅ مفعّل' if pin_on else '❌ غير مفعّل'}",
         f"🟢 الجلسات النشطة: {active}",
         f"🚫 المحجوبون: {blocked}",
-        f"⏱ انتهاء الجلسة بعد: {SESSION_TIMEOUT // 60} دقيقة من الخمول",
+        f"⏱ انتهاء الجلسة بعد: {SESSION_TIMEOUT // 60} دقيقة",
+        f"⏱ انتهاء الجلسة بعد خمول: {IDLE_TIMEOUT // 60} دقيقة",
         f"🛡 حد الطلبات: {RATE_LIMIT_MAX} أمر / دقيقة",
     ]
     if blocked > 0:

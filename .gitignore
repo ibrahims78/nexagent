@@ -14,3 +14,23 @@ config.json
 .env
 .venv/
 venv/
+
+# Config files with real credentials
+nexagent_config.ini
+pc-commander/nexagent_config.ini
+SshRemote_V2/sshremote_config.ini
+pre_login/pre_login_config.json
+
+# Encrypted config & keys
+known_hosts.json
+security_state.json
+
+# Logs
+logs/
+commands.log
+
+# Temp
+*.tmp
+bore_out.txt
+bore_err.txt
+bore_port.txt
