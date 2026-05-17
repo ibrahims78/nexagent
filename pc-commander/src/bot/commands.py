@@ -9,13 +9,11 @@ _ssh_executor = None
 
 
 def set_vision_handler(handler) -> None:
-    """Register the shared VisionHandler so vision commands can use it."""
     global _vision_handler
     _vision_handler = handler
 
 
 def set_ssh_executor(executor) -> None:
-    """Register the shared SSHExecutor so SSH commands can use it."""
     global _ssh_executor
     _ssh_executor = executor
 
@@ -195,13 +193,19 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
 
         elif command == "autologon_enable":
             username = args[0] if len(args) > 0 else ""
-            password = args[1] if len(args) > 1 else ""
-            domain = args[2] if len(args) > 2 else ""
-            if not username or not password:
-                result_text = "⚠️ الاستخدام: autologon_enable <username> <password> [domain]"
+            domain = args[1] if len(args) > 1 else ""
+            if not username:
+                result_text = (
+                    "⚠️ الاستخدام: autologon_enable <username> [domain]\n"
+                    "⚠️ كلمة المرور لا تُرسَل عبر تيليغرام — ستُدخَل محلياً من نافذة الإعدادات فقط."
+                )
             else:
-                from src.pc_control.autologon import setup_autologon
-                result_text = setup_autologon(username, password, domain)
+                result_text = (
+                    "🔐 **تفعيل Autologon**\n\n"
+                    f"المستخدم: `{username}`\n\n"
+                    "⚠️ لأسباب أمنية، كلمة المرور لا تُرسَل عبر تيليغرام.\n"
+                    "افتح نافذة الإعدادات على الجهاز مباشرةً ← تبويب \"تسجيل الدخول\" لإتمام الإعداد."
+                )
 
         elif command == "autologon_disable":
             from src.pc_control.autologon import disable_autologon
@@ -385,7 +389,6 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
 
 
 def _wol_check_status(config: dict) -> str:
-    """Ping the PC on port 445 to determine if it is online."""
     import socket
     pc_ip = config.get("wol", {}).get("pc_ip", "")
     if not pc_ip:

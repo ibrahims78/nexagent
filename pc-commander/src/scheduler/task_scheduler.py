@@ -12,9 +12,10 @@ TASKS_FILE = get_config_dir() / "scheduled_tasks.json"
 
 class TaskScheduler:
     def __init__(self, bot=None, config: dict = None):
-        self.scheduler = BackgroundScheduler(timezone="Asia/Riyadh")
-        self.bot = bot
         self.config = config or {}
+        tz = self.config.get("general", {}).get("timezone", "Asia/Riyadh")
+        self.scheduler = BackgroundScheduler(timezone=tz)
+        self.bot = bot
         self.tasks = self._load_tasks()
 
     def start(self):

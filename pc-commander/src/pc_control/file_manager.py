@@ -17,6 +17,8 @@ ALLOWED_BASE_PATHS: list = [
 
 def is_safe_path(path: str) -> bool:
     """Return True only if path resolves inside one of ALLOWED_BASE_PATHS."""
+    if not path or not path.strip():
+        return False
     try:
         resolved = Path(path).resolve()
         return any(

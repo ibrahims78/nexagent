@@ -315,7 +315,8 @@ def test_sftp_get_no_path_returns_usage_hint():
     mock_exec = MagicMock()
     cmd_module.set_ssh_executor(mock_exec)
     text, _ = cmd_module.execute_command("sftp_get", [], {})
-    assert "⚠️" in text
+    # Whitelist now catches missing args before the handler — any rejection msg is valid
+    assert text != "" and ("⚠️" in text or "معطيات" in text or "مسموح" in text)
     cmd_module.set_ssh_executor(None)
 
 

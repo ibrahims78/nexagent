@@ -1,0 +1,56 @@
+# Configuration files with credentials
+nexagent_config.ini
+pre_login/pre_login_config.json
+
+# Security & session state
+known_hosts.json
+security_state.json
+**/security_state.json
+
+# HTTP API token (sensitive)
+http_token.json
+**/http_token.json
+
+# Encryption key
+secret.key
+**/secret.key
+
+# Encrypted config
+config.json
+**/config.json
+
+# Logs
+*.log
+logs/
+**/logs/
+
+# Screenshots & downloads
+screenshots/
+downloads/
+**/screenshots/
+**/downloads/
+
+# Scheduled tasks
+scheduled_tasks.json
+**/scheduled_tasks.json
+
+# Build artifacts
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+*.pyo
+.eggs/
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.venv/
+venv/
+.idea/
+.vscode/
+*.swp
+
+# Binary / instruction assets (never commit)
+attached_assets/

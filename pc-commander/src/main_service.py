@@ -1,3 +1,4 @@
+import json
 import secrets
 from src.utils.logger import get_logger
 
@@ -14,6 +15,7 @@ class PCCommanderService:
         self.server_thread = None
         self.ai_handler = None
         self._ssh_executor = None
+        self._http_token = ""
         self._running = False
 
     def start(self, config: dict):
@@ -40,10 +42,24 @@ class PCCommanderService:
 
     def _start_server(self):
         from src.server.http_server import start_server, set_secret_token
-        token = secrets.token_urlsafe(16)
-        set_secret_token(token)
+        from src.utils.config import get_config_dir
+
+        token_file = get_config_dir() / "http_token.json"
+        if token_file.exists():
+            try:
+                with open(token_file) as f:
+                    self._http_token = json.load(f).get("token", "")
+            except Exception:
+                self._http_token = ""
+
+        if not self._http_token:
+            self._http_token = secrets.token_urlsafe(32)
+            with open(token_file, "w") as f:
+                json.dump({"token": self._http_token}, f)
+
+        set_secret_token(self._http_token)
         self.server_thread = start_server(port=5000)
-        logger.info("Local HTTP server listening on port 5000")
+        logger.info("Local HTTP server on port 5000 (token persisted to http_token.json)")
 
     def _start_tunnel(self):
         provider = self.config["tunnel"].get("provider", "cloudflare")
@@ -80,12 +96,16 @@ class PCCommanderService:
         logger.info(f"AI provider: {provider}")
 
     def _wire_vision_handler(self):
-        """Share a single VisionHandler instance with the commands module."""
+        """Share a single VisionHandler instance (OpenAI only) with the commands module."""
         try:
             from src.bot.commands import set_vision_handler
             from src.ai.vision_handler import VisionHandler
-            set_vision_handler(VisionHandler(self.ai_handler))
-            logger.info("VisionHandler wired into commands")
+            provider = self.config.get("ai", {}).get("provider", "openai")
+            if provider == "openai" and self.ai_handler:
+                set_vision_handler(VisionHandler(ai_handler=self.ai_handler))
+                logger.info("VisionHandler wired into commands")
+            else:
+                logger.info("VisionHandler skipped (non-OpenAI provider)")
         except Exception as e:
             logger.warning(f"VisionHandler not wired (non-fatal): {e}")
 
@@ -126,13 +146,11 @@ class PCCommanderService:
             new_password = secrets.token_urlsafe(12)
             self.config["stream"]["password"] = new_password
             logger.info("Stream password was empty — generated a random password.")
-
             from src.utils.config import save_config
             try:
                 save_config(self.config)
             except Exception as e:
                 logger.warning(f"Could not persist generated stream password: {e}")
-
             self._pending_stream_password_notice = new_password
         else:
             self._pending_stream_password_notice = None
@@ -145,7 +163,7 @@ class PCCommanderService:
         message = (
             "🔐 **كلمة مرور البث العشوائية**\n\n"
             f"`{password}`\n\n"
-            "⚠️ احفظها — لن تُرسل مرة أخرى.\n"
+            "⚠️ احفظها — لن تُرسَل مرة أخرى.\n"
             "يمكنك تغييرها من الإعدادات."
         )
         try:

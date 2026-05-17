@@ -36,6 +36,7 @@ DEFAULT_CONFIG = {
     },
     "general": {
         "language": "ar",
+        "timezone": "Asia/Riyadh",
         "start_with_windows": False,
         "do_not_disturb": False,
         "daily_report_time": "08:00",

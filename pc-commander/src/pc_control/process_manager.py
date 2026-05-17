@@ -3,6 +3,9 @@ import subprocess
 import sys
 import psutil
 import os
+from src.utils.logger import get_logger
+
+logger = get_logger()
 
 IS_WINDOWS = sys.platform == "win32"
 
@@ -26,6 +29,15 @@ SAFE_APPS: set = {
     "code", "code.exe",
     "anydesk", "anydesk.exe",
     "taskmgr", "taskmgr.exe",
+}
+
+BLOCKED_CMD_PREFIXES = {
+    "format", "del /f /s", "rd /s", "rmdir /s",
+    "rm -rf", "dd if=", ":(){:|:&};:",
+    "mkfs", "fdisk", "diskpart",
+    "reg delete", "reg add",
+    "netsh firewall", "sc delete",
+    "bcdedit", "bootrec",
 }
 
 
@@ -80,11 +92,18 @@ def list_running_processes() -> str:
 
 
 def run_command(command: str) -> str:
+    cmd_lower = command.lower().strip()
+    for blocked in BLOCKED_CMD_PREFIXES:
+        if cmd_lower.startswith(blocked) or blocked in cmd_lower:
+            logger.warning(f"Blocked dangerous command attempt: {command[:100]}")
+            return f"❌ الأمر محظور لأسباب أمنية: `{command[:50]}`"
     try:
         args = shlex.split(command)
+        if not args:
+            return "❌ أمر فارغ"
         result = subprocess.run(
-            args, shell=False, capture_output=True, text=True, timeout=30,
-            encoding="utf-8", errors="replace"
+            args, shell=False, capture_output=True, text=True,
+            timeout=30, encoding="utf-8", errors="replace"
         )
         output = result.stdout or result.stderr or "✅ تم تنفيذ الأمر"
         return f"```\n{output[:2000]}\n```"

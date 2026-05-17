@@ -38,7 +38,7 @@ COMMAND_REGISTRY: dict = {
     "vision_describe":   {"min_args": 0, "max_args": 0},
     "vision_find_click": {"min_args": 1, "max_args": 1},
     "vision_task":       {"min_args": 0, "max_args": 50},
-    "autologon_enable":  {"min_args": 2, "max_args": 3},
+    "autologon_enable":  {"min_args": 1, "max_args": 2},
     "autologon_disable": {"min_args": 0, "max_args": 0},
     "autologon_status":  {"min_args": 0, "max_args": 0},
     "pre_login_status":  {"min_args": 0, "max_args": 0},

@@ -42,16 +42,25 @@ class PCCommanderBot:
         self._thread = None
 
     def is_authorized(self, user_id: int) -> bool:
-        """Return True if user_id is in the allowed list (internal helper only)."""
         if not self.allowed_users:
             return False
         return user_id in self.allowed_users
 
+    def _trim_context_cache(self) -> None:
+        """Evict stale entries first, then oldest by insertion order if still over limit."""
+        now = time.time()
+        stale = [
+            uid for uid, ts in self.last_activity.items()
+            if now - ts > 7200
+        ]
+        for uid in stale:
+            self.conversation_context.pop(uid, None)
+            self.last_activity.pop(uid, None)
+
+        while len(self.conversation_context) > MAX_USERS_CONTEXT:
+            self.conversation_context.popitem(last=False)
+
     async def _check_auth_and_session(self, update: Update) -> bool:
-        """
-        Full authorization gate: whitelist + block + rate-limit + PIN/session.
-        Returns True when the caller may proceed.
-        """
         user = update.effective_user
         uid = user.id
         allowed, reason = check_authorization(uid, self.config)
@@ -93,10 +102,6 @@ class PCCommanderBot:
         update: Update,
         context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        """
-        Process a text command from any source (text message or transcribed voice).
-        Centralised here so handle_text and handle_voice share the same logic.
-        """
         self.last_activity[user_id] = time.time()
         refresh_session(user_id)
 
@@ -123,7 +128,7 @@ class PCCommanderBot:
             self.conversation_context.move_to_end(user_id)
 
             if len(self.conversation_context) > MAX_USERS_CONTEXT:
-                self.conversation_context.popitem(last=False)
+                self._trim_context_cache()
 
             if command != "chat":
                 result_text, result_file = execute_command(command, args, self.config)
@@ -334,7 +339,6 @@ class PCCommanderBot:
                 notifier.notify_async(query.from_user.id)
 
     async def send_notification(self, message: str):
-        """Send a message to all allowed users."""
         if not self.app or not self.allowed_users:
             return
         for uid in self.allowed_users:
@@ -344,19 +348,16 @@ class PCCommanderBot:
                 logger.error(f"Failed to send notification: {e}")
 
     def start(self):
-        """Start the bot in a background thread."""
         self._running = True
         self._thread = threading.Thread(target=self._run_bot, daemon=True)
         self._thread.start()
 
     def _run_bot(self):
-        """Thread target: create an event loop and run the bot."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self._async_run())
 
     async def _async_run(self):
-        """Build and start the Telegram Application."""
         self.app = Application.builder().token(self.token).build()
 
         self.app.add_handler(CommandHandler("start", self.start_command))
@@ -383,7 +384,6 @@ class PCCommanderBot:
                 return self.config
 
             def _restart():
-                """Restart the bot gracefully after a watchdog-detected failure."""
                 try:
                     self.stop()
                     time.sleep(2)
@@ -400,7 +400,6 @@ class PCCommanderBot:
         await self.app.run_polling(drop_pending_updates=True)
 
     def stop(self):
-        """Stop the bot, handling both running and idle event-loop states."""
         self._running = False
         if self.app:
             try:
@@ -415,23 +414,12 @@ class PCCommanderBot:
                 logger.warning(f"Bot stop warning: {e}")
 
     def _start_context_cleanup(self) -> None:
-        """Start a background thread that removes idle conversation contexts hourly."""
+        """Background thread that evicts idle conversation contexts every hour."""
         def _cleanup_loop():
-            idle_cutoff = 7200
             while self._running:
                 time.sleep(3600)
-                now = time.time()
-                to_remove = [
-                    uid for uid, last in self.last_activity.items()
-                    if now - last > idle_cutoff
-                ]
-                for uid in to_remove:
-                    self.conversation_context.pop(uid, None)
-                    self.last_activity.pop(uid, None)
-                if to_remove:
-                    logger.info(
-                        f"Context cleanup: removed {len(to_remove)} idle user(s)."
-                    )
+                self._trim_context_cache()
+                logger.info("Hourly context cache cleanup complete.")
 
         t = threading.Thread(
             target=_cleanup_loop, daemon=True, name="ContextCleanup"

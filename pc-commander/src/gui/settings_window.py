@@ -585,8 +585,7 @@ class SettingsWindow(ctk.CTk):
             return
         try:
             subprocess.Popen(
-                ["powershell", "-Command", f"Start-Process '{bat}' -Verb RunAs"],
-                shell=True
+                ["powershell", "-Command", f"Start-Process '{bat}' -Verb RunAs"]
             )
             self.pre_login_status_label.configure(
                 text="🚀 تم فتح نافذة التثبيت (تأكد من الموافقة)", text_color="#66bb6a"
@@ -612,7 +611,7 @@ class SettingsWindow(ctk.CTk):
         cfg = {
             "stream": {
                 "port":    int(self.stream_port_var.get() or 8765),
-                "password": self.stream_pass_var.get() or "pccommander",
+                "password": self.stream_pass_var.get() or "",
                 "fps":     int(self.stream_fps_var.get()),
                 "quality": int(self.stream_quality_var.get()),
                 "scale":   float(self.stream_scale_var.get()),
@@ -681,7 +680,7 @@ class SettingsWindow(ctk.CTk):
         ctk.CTkEntry(stream_frame, textvariable=self.stream_port_var, width=100).grid(row=2, column=1, padx=10, pady=5, sticky="w")
 
         ctk.CTkLabel(stream_frame, text="كلمة المرور:", width=150, anchor="w").grid(row=3, column=0, padx=10, pady=5)
-        self.stream_pass_var = ctk.StringVar(value="pccommander")
+        self.stream_pass_var = ctk.StringVar(value="")
         ctk.CTkEntry(stream_frame, textvariable=self.stream_pass_var, show="●").grid(row=3, column=1, padx=10, pady=5, sticky="ew")
 
         ctk.CTkLabel(stream_frame, text="FPS:", width=150, anchor="w").grid(row=4, column=0, padx=10, pady=5)
@@ -847,7 +846,7 @@ class SettingsWindow(ctk.CTk):
         if "stream" not in self.config:
             self.config["stream"] = {}
         self.config["stream"]["port"]     = int(self.stream_port_var.get() or 8765)
-        self.config["stream"]["password"] = self.stream_pass_var.get() or "pccommander"
+        self.config["stream"]["password"] = self.stream_pass_var.get() or ""
         self.config["stream"]["fps"]      = int(self.stream_fps_var.get())
         self.config["stream"]["quality"]  = int(self.stream_quality_var.get())
         self.config["stream"]["scale"]    = float(self.stream_scale_var.get())

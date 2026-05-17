@@ -67,8 +67,9 @@ def _build_security_config(config: dict) -> dict:
 def is_internet_available(timeout: int = 5) -> bool:
     for _ in range(10):
         try:
-            socket.setdefaulttimeout(timeout)
-            socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("8.8.8.8", 53))
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(timeout)
+                s.connect(("8.8.8.8", 53))
             return True
         except Exception:
             time.sleep(3)

@@ -201,12 +201,12 @@ class ScreenStreamServer:
 
         import werkzeug.serving
         self._server = werkzeug.serving.make_server(
-            "0.0.0.0", self.port, self._app, threaded=True
+            "127.0.0.1", self.port, self._app, threaded=True
         )
         self._running = True
         self._thread  = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
-        logger.info(f"✅ Screen stream بدأ على المنفذ {self.port}")
+        logger.info(f"✅ Screen stream بدأ على المنفذ {self.port} (127.0.0.1 only)")
         return True
 
     def stop(self):
@@ -226,12 +226,19 @@ def start_stream(config: dict) -> str:
         if _stream_server and _stream_server.is_running:
             return "⚠️ البث يعمل بالفعل"
 
-        sc  = config.get("stream", {})
-        port    = int(sc.get("port", 8765))
-        password= sc.get("password", "pccommander")
-        fps     = int(sc.get("fps", 5))
-        quality = int(sc.get("quality", 60))
-        scale   = float(sc.get("scale", 0.8))
+        sc       = config.get("stream", {})
+        port     = int(sc.get("port", 8765))
+        password = sc.get("password", "")
+        fps      = int(sc.get("fps", 5))
+        quality  = int(sc.get("quality", 60))
+        scale    = float(sc.get("scale", 0.8))
+
+        if not password:
+            return (
+                "❌ **لا يمكن تشغيل البث بدون كلمة مرور**\n\n"
+                "افتح الإعدادات ← تبويب الإعدادات ← حقل كلمة مرور البث\n"
+                "واضبط كلمة مرور قبل تشغيل البث."
+            )
 
         _stream_server = ScreenStreamServer(port, password, fps, quality, scale)
         try:

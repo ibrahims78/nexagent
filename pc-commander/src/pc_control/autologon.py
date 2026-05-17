@@ -35,7 +35,8 @@ def setup_autologon(username: str, password: str, domain: str = "") -> str:
             domain = os.environ.get("USERDOMAIN", os.environ.get("COMPUTERNAME", "."))
 
         result = subprocess.run(
-            [str(AUTOLOGON_PATH), username, domain, password, "/accepteula"],
+            [str(AUTOLOGON_PATH), username, domain, "/accepteula"],
+            input=password,
             capture_output=True, text=True, timeout=15
         )
         if result.returncode == 0:

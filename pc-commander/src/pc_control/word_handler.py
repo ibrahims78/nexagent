@@ -1,9 +1,12 @@
 import os
 from pathlib import Path
 from datetime import datetime
+from src.pc_control.file_manager import is_safe_path
 
 
 def open_and_read_word(path: str) -> str:
+    if not is_safe_path(path):
+        return "❌ الوصول مرفوض: المسار خارج النطاق المسموح به"
     try:
         from docx import Document
         doc = Document(path)
@@ -14,6 +17,8 @@ def open_and_read_word(path: str) -> str:
 
 
 def append_to_word(path: str, text: str) -> str:
+    if not is_safe_path(path):
+        return "❌ الوصول مرفوض: المسار خارج النطاق المسموح به"
     try:
         from docx import Document
         if os.path.exists(path):
@@ -28,6 +33,8 @@ def append_to_word(path: str, text: str) -> str:
 
 
 def create_word_document(path: str, title: str = "", content: str = "") -> str:
+    if not is_safe_path(path):
+        return "❌ الوصول مرفوض: المسار خارج النطاق المسموح به"
     try:
         from docx import Document
         doc = Document()
@@ -43,6 +50,8 @@ def create_word_document(path: str, title: str = "", content: str = "") -> str:
 
 
 def replace_text_in_word(path: str, old_text: str, new_text: str) -> str:
+    if not is_safe_path(path):
+        return "❌ الوصول مرفوض: المسار خارج النطاق المسموح به"
     try:
         from docx import Document
         doc = Document(path)
@@ -60,6 +69,8 @@ def replace_text_in_word(path: str, old_text: str, new_text: str) -> str:
 
 
 def add_table_to_word(path: str, headers: list, rows: list) -> str:
+    if not is_safe_path(path):
+        return "❌ الوصول مرفوض: المسار خارج النطاق المسموح به"
     try:
         from docx import Document
         if os.path.exists(path):
