@@ -97,11 +97,16 @@ def simulate_login_keystrokes(password: str):
         return True
     except Exception:
         try:
-            subprocess.run(
-                ["powershell", "-Command",
-                 f"$wsh = New-Object -ComObject wscript.shell; $wsh.SendKeys('{password}{{ENTER}}')"],
-                timeout=10, capture_output=True
-            )
+            import win32api
+            import win32con
+            for char in password:
+                vk = win32api.VkKeyScan(char)
+                if vk != -1:
+                    win32api.keybd_event(vk & 0xFF, 0, 0, 0)
+                    win32api.keybd_event(vk & 0xFF, 0, win32con.KEYEVENTF_KEYUP, 0)
+                    time.sleep(0.05)
+            win32api.keybd_event(win32con.VK_RETURN, 0, 0, 0)
+            win32api.keybd_event(win32con.VK_RETURN, 0, win32con.KEYEVENTF_KEYUP, 0)
             return True
         except Exception as e:
             log(f"فشل محاكاة ضغط المفاتيح: {e}")

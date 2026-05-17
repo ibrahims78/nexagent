@@ -145,14 +145,31 @@ def create_stream_app(password_hash: str, fps: int, quality: int, scale: float) 
     app.secret_key = secrets.token_hex(32)
 
     SESSION_COOKIE = "pcc_auth"
-    _active_sessions: dict = {}
+    SESSION_TTL = 86400  # 24 hours
+    _active_sessions: dict = {}  # token -> expiry_timestamp
 
     def is_authenticated():
         token = request.cookies.get(SESSION_COOKIE)
-        return bool(token and _active_sessions.get(token))
+        if not token:
+            return False
+        expiry = _active_sessions.get(token)
+        if expiry is None:
+            return False
+        if time.time() > expiry:
+            _active_sessions.pop(token, None)
+            return False
+        return True
 
     def logout_session(token: str):
         _active_sessions.pop(token, None)
+
+    def _cleanup_sessions():
+        now = time.time()
+        expired = [t for t, exp in list(_active_sessions.items()) if now > exp]
+        for t in expired:
+            _active_sessions.pop(t, None)
+
+    _cleanup_sessions()
 
     @app.route("/", methods=["GET", "POST"])
     def index():
@@ -162,7 +179,7 @@ def create_stream_app(password_hash: str, fps: int, quality: int, scale: float) 
             pwd = request.form.get("password", "")
             if _hash_password(pwd) == password_hash:
                 session_token = secrets.token_hex(32)
-                _active_sessions[session_token] = True
+                _active_sessions[session_token] = time.time() + SESSION_TTL
                 resp = Response(render_template_string(HTML_VIEWER))
                 resp.set_cookie(SESSION_COOKIE, session_token, httponly=True, samesite="Strict")
                 return resp
