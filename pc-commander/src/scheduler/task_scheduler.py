@@ -1,3 +1,4 @@
+import asyncio
 import json
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -52,10 +53,10 @@ class TaskScheduler:
         try:
             report = get_daily_report()
             if self.bot:
-                import asyncio
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(self.bot.send_notification(report))
-                loop.close()
+                try:
+                    asyncio.run(self.bot.send_notification(report))
+                except RuntimeError:
+                    pass
         except Exception as e:
             logger.error(f"خطأ في التقرير اليومي: {e}")
 
@@ -65,10 +66,10 @@ class TaskScheduler:
             alerts = check_alerts(self.config)
             if alerts and self.bot:
                 message = "⚠️ **تنبيهات النظام:**\n" + "\n".join(alerts)
-                import asyncio
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(self.bot.send_notification(message))
-                loop.close()
+                try:
+                    asyncio.run(self.bot.send_notification(message))
+                except RuntimeError:
+                    pass
         except Exception as e:
             logger.error(f"خطأ في فحص التنبيهات: {e}")
 
@@ -109,12 +110,12 @@ class TaskScheduler:
         try:
             result_text, _ = execute_command(command, [], self.config)
             if self.bot:
-                import asyncio
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(
-                    self.bot.send_notification(f"⏰ **مهمة مجدولة:**\n{result_text}")
-                )
-                loop.close()
+                try:
+                    asyncio.run(self.bot.send_notification(
+                        f"⏰ **مهمة مجدولة:**\n{result_text}"
+                    ))
+                except RuntimeError:
+                    pass
         except Exception as e:
             logger.error(f"خطأ في تنفيذ المهمة المجدولة: {e}")
 

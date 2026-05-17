@@ -34,3 +34,17 @@ commands.log
 bore_out.txt
 bore_err.txt
 bore_port.txt
+
+# WoL agent config (contains MAC, IP, bot token)
+wol_config.json
+**/wol_config.json
+
+# SSH public key (identity fingerprint)
+sshremote_key.pub
+**/sshremote_key.pub
+
+# Pre-login config (contains bot token)
+**/pre_login_config.json
+
+# Binary / instruction assets (never commit)
+attached_assets/

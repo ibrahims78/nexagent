@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.1] - 2026-05-17
+
+### Bug Fixes
+- Add SpeechRecognition>=3.10.0 and pyaudio to requirements.txt (was causing ModuleNotFoundError on voice input)
+- Sync APP_VERSION to 1.2.0 in settings_window.py and setup.iss
+- Replace deprecated asyncio.new_event_loop() with asyncio.run() in watchdog.py, task_scheduler.py, network_monitor.py, wol_notifier.py, telegram_bot.py, and main_service.py
+- Fix BLOCKED_CMD_PREFIXES to use regex word boundaries (prevents false positives like blocking "reformat" or "rmdir" in filenames)
+- Untrack attached_assets/ from git index
+- Add wol_config.json, sshremote_key.pub, and pre_login_config.json to .gitignore (both root and pc-commander)
+
 ## [1.2.0] - 2026-05-17
 
 ### Security

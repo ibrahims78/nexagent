@@ -35,20 +35,18 @@ def _is_internet_available() -> bool:
 
 def _send_telegram_notification(bot, config: dict, text: str):
     """Send a Telegram message to all allowed users."""
-    try:
+    async def _send():
         users = config.get("telegram", {}).get("allowed_users", [])
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        for uid in users:
+            try:
+                await bot.send_message(chat_id=int(uid), text=text, parse_mode="Markdown")
+            except Exception as e:
+                logger.warning(f"Watchdog: failed to notify {uid}: {e}")
 
-        async def _send():
-            for uid in users:
-                try:
-                    await bot.send_message(chat_id=int(uid), text=text, parse_mode="Markdown")
-                except Exception as e:
-                    logger.warning(f"Watchdog: failed to notify {uid}: {e}")
-
-        loop.run_until_complete(_send())
-        loop.close()
+    try:
+        asyncio.run(_send())
+    except RuntimeError:
+        pass
     except Exception as e:
         logger.error(f"Watchdog notification error: {e}")
 

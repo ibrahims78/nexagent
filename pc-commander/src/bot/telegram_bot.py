@@ -353,9 +353,7 @@ class PCCommanderBot:
         self._thread.start()
 
     def _run_bot(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._async_run())
+        asyncio.run(self._async_run())
 
     async def _async_run(self):
         self.app = Application.builder().token(self.token).build()

@@ -58,10 +58,10 @@ class WoLNotifier:
 
     def notify_async(self, requester_id: int = None):
         def run():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.notify_backup_person(requester_id))
-            loop.close()
+            try:
+                asyncio.run(self.notify_backup_person(requester_id))
+            except RuntimeError:
+                pass
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
@@ -80,15 +80,14 @@ class WoLNotifier:
             start = time.time()
             while time.time() - start < timeout:
                 try:
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.settimeout(3)
-                    result = sock.connect_ex((pc_ip, 445))
-                    sock.close()
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                        sock.settimeout(3)
+                        result = sock.connect_ex((pc_ip, 445))
                     if result == 0:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(self.notify_wol_success(target_users))
-                        loop.close()
+                        try:
+                            asyncio.run(self.notify_wol_success(target_users))
+                        except RuntimeError:
+                            pass
                         return
                 except Exception:
                     pass

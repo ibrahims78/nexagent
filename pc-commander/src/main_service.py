@@ -167,9 +167,9 @@ class PCCommanderService:
             "يمكنك تغييرها من الإعدادات."
         )
         try:
-            loop = asyncio.new_event_loop()
-            loop.run_until_complete(self.bot.send_notification(message))
-            loop.close()
+            asyncio.run(self.bot.send_notification(message))
+        except RuntimeError:
+            pass
         except Exception as e:
             logger.error(f"Failed to notify stream password: {e}")
 

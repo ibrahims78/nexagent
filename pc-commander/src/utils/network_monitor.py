@@ -1,3 +1,4 @@
+import asyncio
 import threading
 import time
 import socket
@@ -33,12 +34,12 @@ class NetworkMonitor:
                 logger.info("✅ عاد الإنترنت")
                 self._was_connected = True
                 if self.bot:
-                    import asyncio
-                    loop = asyncio.new_event_loop()
-                    loop.run_until_complete(
-                        self.bot.send_notification("✅ **عاد الاتصال بالإنترنت**\nجميع الخدمات تعمل الآن.")
-                    )
-                    loop.close()
+                    try:
+                        asyncio.run(self.bot.send_notification(
+                            "✅ **عاد الاتصال بالإنترنت**\nجميع الخدمات تعمل الآن."
+                        ))
+                    except RuntimeError:
+                        pass
             time.sleep(self.check_interval)
 
     def _check_connection(self) -> bool:

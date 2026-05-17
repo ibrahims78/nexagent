@@ -1,3 +1,4 @@
+import re as _re
 import shlex
 import subprocess
 import sys
@@ -31,14 +32,25 @@ SAFE_APPS: set = {
     "taskmgr", "taskmgr.exe",
 }
 
-BLOCKED_CMD_PREFIXES = {
-    "format", "del /f /s", "rd /s", "rmdir /s",
-    "rm -rf", "dd if=", ":(){:|:&};:",
-    "mkfs", "fdisk", "diskpart",
-    "reg delete", "reg add",
-    "netsh firewall", "sc delete",
-    "bcdedit", "bootrec",
-}
+BLOCKED_CMD_PATTERNS = [
+    r'\bformat\b',
+    r'\bdel\s+/f\s+/s\b',
+    r'\brd\s+/s\b',
+    r'\brmdir\s+/s\b',
+    r'\brm\s+-rf\b',
+    r'\bdd\s+if=',
+    r':\(\)\{:\|:&\};:',
+    r'\bmkfs\b',
+    r'\bfdisk\b',
+    r'\bdiskpart\b',
+    r'\breg\s+delete\b',
+    r'\breg\s+add\b',
+    r'\bnetsh\s+firewall\b',
+    r'\bsc\s+delete\b',
+    r'\bbcdedit\b',
+    r'\bbootrec\b',
+]
+_BLOCKED_RE = _re.compile('|'.join(BLOCKED_CMD_PATTERNS), _re.IGNORECASE)
 
 
 def open_application(app_name: str) -> str:
@@ -84,7 +96,10 @@ def list_running_processes() -> str:
     for proc in psutil.process_iter(["name", "pid", "cpu_percent", "memory_percent"]):
         try:
             if proc.info["cpu_percent"] > 0.1:
-                procs.append(f"• {proc.info['name']} (PID: {proc.info['pid']}) CPU: {proc.info['cpu_percent']:.1f}%")
+                procs.append(
+                    f"• {proc.info['name']} (PID: {proc.info['pid']}) "
+                    f"CPU: {proc.info['cpu_percent']:.1f}%"
+                )
         except Exception:
             pass
     procs.sort()
@@ -92,11 +107,9 @@ def list_running_processes() -> str:
 
 
 def run_command(command: str) -> str:
-    cmd_lower = command.lower().strip()
-    for blocked in BLOCKED_CMD_PREFIXES:
-        if cmd_lower.startswith(blocked) or blocked in cmd_lower:
-            logger.warning(f"Blocked dangerous command attempt: {command[:100]}")
-            return f"❌ الأمر محظور لأسباب أمنية: `{command[:50]}`"
+    if _BLOCKED_RE.search(command):
+        logger.warning(f"Blocked dangerous command: {command[:100]}")
+        return f"❌ الأمر محظور لأسباب أمنية: `{command[:50]}`"
     try:
         args = shlex.split(command)
         if not args:
