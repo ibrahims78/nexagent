@@ -6,6 +6,7 @@ import io
 import time
 import threading
 import hashlib
+import secrets
 
 try:
     from flask import Flask, Response, request, abort, render_template_string
@@ -141,13 +142,17 @@ def _generate_stream(fps: int, quality: int, scale: float):
 
 def create_stream_app(password_hash: str, fps: int, quality: int, scale: float) -> Flask:
     app = Flask(__name__)
-    app.secret_key = password_hash[:32]
+    app.secret_key = secrets.token_hex(32)
 
     SESSION_COOKIE = "pcc_auth"
+    _active_sessions: dict = {}
 
     def is_authenticated():
         token = request.cookies.get(SESSION_COOKIE)
-        return token == password_hash
+        return bool(token and _active_sessions.get(token))
+
+    def logout_session(token: str):
+        _active_sessions.pop(token, None)
 
     @app.route("/", methods=["GET", "POST"])
     def index():
@@ -156,11 +161,22 @@ def create_stream_app(password_hash: str, fps: int, quality: int, scale: float) 
         if request.method == "POST":
             pwd = request.form.get("password", "")
             if _hash_password(pwd) == password_hash:
+                session_token = secrets.token_hex(32)
+                _active_sessions[session_token] = True
                 resp = Response(render_template_string(HTML_VIEWER))
-                resp.set_cookie(SESSION_COOKIE, password_hash, httponly=True)
+                resp.set_cookie(SESSION_COOKIE, session_token, httponly=True, samesite="Strict")
                 return resp
             return render_template_string(HTML_LOGIN, error=True)
         return render_template_string(HTML_LOGIN, error=False)
+
+    @app.route("/logout", methods=["POST"])
+    def logout():
+        token = request.cookies.get(SESSION_COOKIE)
+        if token:
+            logout_session(token)
+        resp = Response("", status=302, headers={"Location": "/"})
+        resp.delete_cookie(SESSION_COOKIE)
+        return resp
 
     @app.route("/stream")
     def stream():

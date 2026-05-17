@@ -5,6 +5,8 @@ PC Commander - Security & Authorization
 import json
 import time
 import hashlib
+import hmac
+import os
 import secrets
 import threading
 from collections import defaultdict
@@ -59,8 +61,11 @@ def _save_state():
 _load_state()
 
 
-def _hash_pin(pin: str) -> str:
-    return hashlib.sha256(pin.encode()).hexdigest()
+def _hash_pin(pin: str, salt: bytes = None) -> tuple[str, str]:
+    if salt is None:
+        salt = os.urandom(16)
+    dk = hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, 100_000)
+    return dk.hex(), salt.hex()
 
 
 def is_allowed_user(user_id: int, config: dict) -> bool:
@@ -153,8 +158,10 @@ def request_pin_auth(user_id: int, config: dict) -> str:
 
 
 def verify_pin(user_id: int, entered_pin: str, config: dict) -> str:
-    pin_hash = _hash_pin(config.get("security", {}).get("session_pin", ""))
-    entered_hash = _hash_pin(entered_pin.strip())
+    stored_pin = config.get("security", {}).get("session_pin", "")
+    salt = os.urandom(16)
+    pin_hash, _ = _hash_pin(stored_pin, salt)
+    entered_hash, _ = _hash_pin(entered_pin.strip(), salt)
 
     with _lock:
         pending = _pending_pin.get(user_id)
@@ -163,7 +170,7 @@ def verify_pin(user_id: int, entered_pin: str, config: dict) -> str:
         if time.time() > pending["expires_at"]:
             del _pending_pin[user_id]
             return "EXPIRED"
-        if entered_hash != pin_hash:
+        if not hmac.compare_digest(entered_hash, pin_hash):
             pending["attempts"] += 1
             if pending["attempts"] >= MAX_PIN_ATTEMPTS:
                 del _pending_pin[user_id]

@@ -76,6 +76,13 @@ def is_internet_available(timeout: int = 5) -> bool:
     return False
 
 
+def attempt_auto_login(*args, **kwargs):
+    raise NotImplementedError(
+        "Auto-login via Telegram is disabled for security reasons. "
+        "Enable only after reviewing security implications."
+    )
+
+
 def simulate_login_keystrokes(password: str):
     try:
         import win32api
@@ -216,7 +223,12 @@ async def run_pre_login_bot(config: dict):
 
         if login_event.is_set() and login_password[0]:
             log("🔓 محاولة تسجيل الدخول...")
-            success = simulate_login_keystrokes(login_password[0])
+            try:
+                attempt_auto_login(login_password[0])
+                success = False
+            except NotImplementedError as e:
+                log(f"⛔ {e}")
+                success = False
             if success:
                 for uid in allowed_users:
                     try:

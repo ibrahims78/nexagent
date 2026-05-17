@@ -49,6 +49,15 @@ BLOCKED_CMD_PATTERNS = [
     r'\bsc\s+delete\b',
     r'\bbcdedit\b',
     r'\bbootrec\b',
+    r'\bpowershell\b.*-e(nc|nco|ncod|ncode|ncoded)?\b',
+    r'\bpowershell\b.*-[Ee]',
+    r'\bcmd\b.*/[cCkK]',
+    r'\bwscript\b',
+    r'\bcscript\b',
+    r'\bmshta\b',
+    r'\bregsvr32\b',
+    r'\bcertutil\b.*-decode',
+    r'\bbitsadmin\b',
 ]
 _BLOCKED_RE = _re.compile('|'.join(BLOCKED_CMD_PATTERNS), _re.IGNORECASE)
 
@@ -107,6 +116,8 @@ def list_running_processes() -> str:
 
 
 def run_command(command: str) -> str:
+    if len(command) > 500:
+        return "❌ الأمر طويل جداً"
     if _BLOCKED_RE.search(command):
         logger.warning(f"Blocked dangerous command: {command[:100]}")
         return f"❌ الأمر محظور لأسباب أمنية: `{command[:50]}`"
