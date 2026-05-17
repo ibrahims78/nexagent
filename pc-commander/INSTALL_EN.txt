@@ -1,17 +1,23 @@
-╔══════════════════════════════════════════════════════════╗
-║               NexAgent — Installation Guide              ║
-║         Full Remote PC Control via Telegram              ║
-║                    Version 1.1.0                         ║
-╚══════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════╗
+║              NexAgent — Complete Installation Guide              ║
+║       Layer 1: AI Bot  +  Layer 2: SSH Tunnel (SshRemote)       ║
+║                        Version 1.1.0                             ║
+╚══════════════════════════════════════════════════════════════════╝
 
 ═══════════════════════════════════
 1. WHAT IS NEXAGENT?
 ═══════════════════════════════════
 
-NexAgent is a Telegram bot that gives you full remote control
-over a Windows PC using natural language commands (Arabic or English).
-It uses an AI provider (OpenAI GPT-4o or Google Gemini 1.5 Flash)
-to understand your commands and execute them.
+NexAgent is a two-layer Windows PC remote-control system:
+
+  Layer 1 — AI Telegram Bot:
+    Control your Windows PC with natural language commands (Arabic or English).
+    Powered by OpenAI GPT-4o or Google Gemini 1.5 Flash.
+
+  Layer 2 — SSH Tunnel (SshRemote V2):
+    Passwordless SSH access through an automatic bore tunnel.
+    Works without a static IP or router port-forwarding.
+    Sends the new connection port to Telegram on every reconnect.
 
 Key capabilities:
   - Instant screenshot
@@ -22,6 +28,8 @@ Key capabilities:
   - Wake-on-LAN (remotely power on your PC)
   - Live screen streaming
   - Scheduled daily reports
+  - Shell commands via SSH
+  - File upload/download via SFTP
 
 ═══════════════════════════════════
 2. SYSTEM REQUIREMENTS
@@ -29,8 +37,10 @@ Key capabilities:
 
   - Windows 10 or 11 (64-bit)
   - Python 3.11 or newer  <  python.org/downloads  >
+    (during install: check "Add Python to PATH")
   - Internet connection
   - API key: OpenAI (gpt-4o) or Google Gemini
+  - For Layer 2: Administrator rights to install OpenSSH
 
 ═══════════════════════════════════
 3. CREATE A TELEGRAM BOT
@@ -53,42 +63,42 @@ Key capabilities:
      Example: 123456789
 
 ═══════════════════════════════════
-5. INSTALLATION
+5. INSTALL LAYER 1 — AI BOT
 ═══════════════════════════════════
 
-Method 1 — GUI installer (recommended):
-  a) Double-click NexAgent_Setup.exe
-  b) Follow the wizard steps
-  c) Enter Bot Token and Chat ID when prompted
-  d) Click Install
+Method 1 — Automatic installer (recommended):
+  a) Right-click install.bat
+  b) Choose "Run as administrator"
+  c) Follow the on-screen instructions
 
-Method 2 — Run from source:
+Method 2 — Manual setup:
   a) Make sure Python 3.11+ is installed
   b) Open Command Prompt in the project folder
-  c) Run:  build.bat
-  d) Executable will be at dist\PCCommander\PCCommander.exe
+  c) Run:
+       pip install -r requirements.txt
+  d) Start the bot:
+       python main.py
+
+Method 3 — GUI installer (Inno Setup):
+  a) Double-click NexAgent_Setup.exe
+  b) Follow the wizard steps
 
 ═══════════════════════════════════
-6. FIRST-TIME CONFIGURATION
+6. CONFIGURE LAYER 1 — FIRST TIME
 ═══════════════════════════════════
 
-  a) Enter your Bot Token in the "Bot Token" field
-  b) Enter your Chat ID in the "Allowed Users" field
-     (multiple IDs separated by commas)
-  c) Select your AI provider (OpenAI or Gemini)
-  d) Enter the API key for your chosen provider:
-     OpenAI:  platform.openai.com → API Keys → Create new key
-     Gemini:  aistudio.google.com → Get API Key
-  e) Click "Start Bot"
+  a) Open nexagent_config.ini and fill in:
+       [telegram]
+       bot_token   = YOUR_BOT_TOKEN
+       allowed_users = YOUR_CHAT_ID
 
-═══════════════════════════════════
-7. FIRST RUN
-═══════════════════════════════════
+       [ai]
+       provider    = openai    (or gemini)
+       openai_key  = sk-...    (or gemini_key = AI...)
 
-  a) Open Telegram and find your bot by its username
-  b) Send:  /start
-  c) A quick-command keyboard will appear
-  d) Try: "take a screenshot" or tap the 📸 button
+  b) Start the bot:  python main.py
+  c) Find your bot on Telegram and send:  /start
+  d) A quick-command keyboard will appear
 
 Example commands the bot understands:
   - "Take a screenshot"
@@ -101,60 +111,133 @@ Example commands the bot understands:
   - "Lock the screen"
 
 ═══════════════════════════════════
-8. IMPORTANT FILES REFERENCE
+7. INSTALL LAYER 2 — SSH TUNNEL
+═══════════════════════════════════
+
+Layer 2 is optional. Use it for full SSH terminal access and SFTP
+(scenarios that go beyond what the bot commands cover).
+
+Step 1 — Download bore.exe:
+  Get it from:
+    https://github.com/ekzhang/bore/releases
+  (choose: bore-vX.X.X-x86_64-pc-windows-msvc.zip)
+  Place bore.exe in the core\ folder.
+
+Step 2 — Edit core\sshremote_config.ini:
+  Fill in:
+    [telegram]
+    bot_token = YOUR_BOT_TOKEN
+    chat_id   = YOUR_CHAT_ID
+
+    [install]
+    install_path = C:\SshRemote_V2
+    task_name    = SshRemoteTunnel_V2
+
+    [bore]
+    bore_server = bore.pub
+    local_port  = 22
+
+Step 3 — Run setup_v2.bat as Administrator:
+  Right-click core\setup_v2.bat
+  Choose "Run as administrator"
+  Wait for all 7 steps to complete
+
+Step 4 — Enable SSH commands in the bot:
+  Open nexagent_config.ini and add:
+    [ssh]
+    username = your_windows_username
+
+Step 5 — Verify the connection:
+  In Telegram send: "SSH status"
+  You should receive:
+    ✅ SshRemote connected!
+    🖥️ Device: DESKTOP-ABC
+    🔗 To connect:
+    ssh user@bore.pub -p 54321
+    🔑 Key: sshremote_key
+
+═══════════════════════════════════
+8. SSH COMMANDS VIA THE BOT
+═══════════════════════════════════
+
+  Command              Description
+  ─────────────────────────────────────────────────────
+  "SSH status"         Show tunnel status + connection string
+  "Run via SSH dir C:\" Execute a shell command via SSH
+  "List SSH files"     Browse remote directory via SFTP
+  "Download report.pdf" Download file from PC via SFTP
+  "Current tunnel port" Show active bore port number
+
+═══════════════════════════════════
+9. IMPORTANT FILES REFERENCE
 ═══════════════════════════════════
 
   File / Folder                          Description
   ─────────────────────────────────────────────────────────
-  PCCommander.exe                        Main executable
-  %APPDATA%\PCCommander\                 Data directory
-  %APPDATA%\PCCommander\config.json      Settings file (encrypted)
+  main.py                                Bot entry point
+  nexagent_config.ini                    Unified config (both layers)
+  core\                                  Layer 2 files
+  core\setup_v2.bat                      Layer 2 installer
+  core\sshremote_config.ini              SSH tunnel config
+  %APPDATA%\PCCommander\config.json      Bot settings (encrypted)
   %APPDATA%\PCCommander\secret.key       Encryption key (DO NOT delete!)
   %APPDATA%\PCCommander\logs\            Log files
   %APPDATA%\PCCommander\downloads\       Files received via Telegram
   %APPDATA%\PCCommander\screenshots\     Saved screenshots
+  C:\SshRemote_V2\bore_port.txt          Current tunnel port
 
 ═══════════════════════════════════
-9. TROUBLESHOOTING
+10. TROUBLESHOOTING
 ═══════════════════════════════════
 
 Problem: Bot does not respond
-  Fix: Verify the Bot Token is correct — restart the bot from Settings
+  Fix: Verify the Bot Token — restart the bot
 
 Problem: "You are not authorized to use this bot"
-  Fix: Make sure your Chat ID is listed in the Allowed Users field
+  Fix: Make sure your Chat ID is in the allowed_users field
 
 Problem: AI key error
-  Fix: Check your OpenAI or Gemini key — verify account has quota
+  Fix: Check your OpenAI or Gemini key
 
 Problem: Screenshots not sending
-  Fix: Ensure Pillow and pyautogui are installed (re-run build.bat)
+  Fix: Run:  pip install Pillow pyautogui
 
 Problem: Bot stops after a while
-  Fix: Enable "Watchdog" in settings — it will restart the bot on crashes
+  Fix: Set watchdog_enabled = true in settings
 
 Problem: vision_* commands not working
-  Fix: These require OpenAI GPT-4o only — they do not work with Gemini
+  Fix: These require OpenAI GPT-4o only — not available with Gemini
 
 Problem: Voice messages not transcribed
-  Fix: Use the OpenAI provider — Gemini does not support Whisper transcription
+  Fix: Use the OpenAI provider
 
-Problem: Bot forgets conversation history
-  Fix: Normal after 2 hours of inactivity — contexts are cleaned automatically
+Problem: ssh_* commands return "SSH not configured"
+  Fix: Add ssh.username to the [ssh] section of nexagent_config.ini
+
+Problem: Tunnel stops / no port received
+  Fix: Check bore.exe is in C:\SshRemote_V2\
+       Run core\start_tunnel_v2.bat manually
+       Verify internet connection
+
+Problem: SSH connection fails
+  Fix: Confirm sshd is running:
+         net start sshd
+       Check the port via: core\show_port_v2.bat
 
 Problem: Build error "Python not found"
   Fix: Install Python and check "Add Python to PATH" during setup
 
 ═══════════════════════════════════
-10. SECURITY NOTES
+11. SECURITY NOTES
 ═══════════════════════════════════
 
   - Never share config.json — it contains encrypted keys
   - Never delete secret.key — without it you cannot decrypt your settings
   - Enable PIN in settings for an extra security layer
-  - Read DOCS.md for the full multi-layer security model details
+  - Layer 2 uses public-key auth only (PasswordAuthentication no — no passwords)
+  - bore ports are ephemeral — they change on every reconnect
   - Only add Chat IDs of people you fully trust — they get complete PC control
 
-═══════════════════════════════════════════════════════════
-Full reference: DOCS.md | Version: 1.1.0 | NexAgent Project 2026
-═══════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════════
+Full reference: DOCS.md  |  Version: 1.1.0  |  NexAgent Project 2026
+══════════════════════════════════════════════════════════════════

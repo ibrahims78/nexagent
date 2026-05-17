@@ -7,13 +7,17 @@
 
 ## 1. PROJECT OVERVIEW
 
-NexAgent is a Telegram bot that lets you control a Windows PC through natural Arabic (or English) language commands. It uses an AI provider (OpenAI GPT-4o or Google Gemini) to interpret free-form messages and map them to concrete system actions: taking screenshots, opening applications, managing files, monitoring hardware, and more.
+NexAgent is a two-layer Windows PC remote-control system:
+
+- **Layer 1 — AI Telegram Bot:** Control your Windows PC through natural Arabic (or English) commands. Powered by OpenAI GPT-4o or Google Gemini 1.5 Flash.
+- **Layer 2 — SSH Tunnel (SshRemote V2):** Secure, passwordless SSH access to the machine via a bore tunnel. Works even without a static IP or port-forwarding.
 
 **Key design goals:**
 - Single authorised user (or a small whitelist) controls one Windows machine.
 - Minimal setup — one config file, one executable.
 - Layered security: whitelist → block list → rate limit → PIN → session token.
 - Resilient: a Watchdog thread restarts the bot automatically if it crashes.
+- SSH layer auto-reconnects and notifies you on Telegram with the new port.
 
 ---
 
@@ -23,16 +27,32 @@ NexAgent is a Telegram bot that lets you control a Windows PC through natural Ar
 pc-commander/
 ├── main.py                      Entry point (GUI + tray icon)
 ├── requirements.txt             Python dependencies
-├── build.bat                    Build & package script
+├── build.bat                    Build & package script (both layers)
+├── install.bat                  One-click installer (both layers)
+├── uninstall.bat                Uninstaller (both layers)
 ├── create_icon.py               Generates assets/icon.ico
+├── nexagent_config.ini          Unified config template (Layer 1 + Layer 2)
 ├── VERSION                      Monotonic build counter
 ├── DOCS.md                      This file
 ├── INSTALL_AR.txt               Arabic installation guide
 ├── INSTALL_EN.txt               English installation guide
 ├── LICENSE.txt
 │
+├── core/                        ── Layer 2: SshRemote V2 ──
+│   ├── sshremote_tunnel_v2.ps1  PowerShell tunnel service (bore + reconnect)
+│   ├── sshremote_config.ini     Layer 2 config (bot_token, chat_id, ports)
+│   ├── sshremote_key.pub        Public key deployed to authorized_keys
+│   ├── setup_v2.bat             Full Layer 2 installer (OpenSSH + task)
+│   ├── start_tunnel_v2.bat      Start tunnel manually
+│   ├── stop_tunnel_v2.bat       Stop tunnel
+│   ├── show_port_v2.bat         Show current bore port
+│   ├── uninstall_v2.bat         Remove Layer 2 completely
+│   ├── README_AR.txt            Arabic Layer 2 guide
+│   └── README_EN.txt            English Layer 2 guide
+│   (bore.exe must be placed here manually — Windows binary)
+│
 ├── installer/
-│   └── setup.iss                Inno Setup script (GUI installer)
+│   └── setup.iss                Inno Setup script (GUI installer, both layers)
 │
 ├── scripts/
 │   └── bump_version.py          Increments VERSION
@@ -63,7 +83,8 @@ pc-commander/
 │   │   ├── word_handler.py      Read/write Word documents
 │   │   ├── anydesk.py           AnyDesk control
 │   │   ├── wake_on_lan.py       WoL magic packet
-│   │   └── autologon.py         Windows auto-login registry
+│   │   ├── autologon.py         Windows auto-login registry
+│   │   └── ssh_executor.py      SSHExecutor — Layer 2 bridge
 │   │
 │   ├── scheduler/
 │   │   └── task_scheduler.py    Daily report scheduler (APScheduler)
@@ -91,10 +112,11 @@ pc-commander/
 │       └── wol_notifier.py      WoL Telegram notification helper
 │
 ├── tests/
-│   ├── test_config.py
-│   ├── test_security_auth.py
-│   ├── test_watchdog.py
-│   └── test_commands.py
+│   ├── test_config.py           5 tests — encryption, round-trip, defaults
+│   ├── test_security_auth.py    10 tests — whitelist, PIN, session, rate-limit
+│   ├── test_watchdog.py         5 tests — socket, internet check, lifecycle
+│   ├── test_commands.py         7 tests — commands, vision guard, chat
+│   └── test_ssh_executor.py     24 tests — SSHExecutor + SSH commands routing
 │
 └── pre_login/
     ├── pre_login_agent.py       Runs before Windows login (SYSTEM task)
@@ -105,6 +127,8 @@ pc-commander/
 ---
 
 ## 3. CONFIGURATION REFERENCE
+
+### 3a. Bot Config (runtime, encrypted)
 
 Config file location: `%APPDATA%\PCCommander\config.json`  
 Sensitive fields are Fernet-encrypted at rest (key stored in `secret.key`).
@@ -139,10 +163,32 @@ Sensitive fields are Fernet-encrypted at rest (key stored in `secret.key`).
 | stream | enabled | bool | false | Enable WebSocket screen streaming |
 | stream | port | int | 8765 | Streaming port |
 | stream | password | str | "pccommander" | Stream password (encrypted) |
+| ssh | username | str | "" | Windows username for SSH login |
+| ssh | key_path | str | "" | Path to SSH private key file |
+| ssh | password | str | "" | SSH password (if no key) |
+| ssh | host | str | "127.0.0.1" | SSH host (always local for Layer 2) |
+| ssh | port | int | 22 | Local SSH port |
+| ssh | bore_port_file | str | "C:\\SshRemote_V2\\bore_port.txt" | Path to bore port file |
+
+### 3b. SSH Layer Config (static INI)
+
+Template: `nexagent_config.ini` (also `core/sshremote_config.ini` for Layer 2 standalone).
+
+| Section | Key | Description |
+|---------|-----|-------------|
+| telegram | bot_token | Telegram bot token (for SSH notifications) |
+| telegram | chat_id | Your Telegram chat ID |
+| bore | bore_server | Relay server (default: bore.pub) |
+| bore | local_port | Local SSH port to tunnel (default: 22) |
+| install | install_path | Where Layer 2 files live (default: C:\SshRemote_V2) |
+| install | task_name | Windows Scheduled Task name |
+| ssh | sshd_port | OpenSSH port (default: 22) |
 
 ---
 
 ## 4. BOT COMMANDS REFERENCE
+
+### 4a. Layer 1 — PC Control Commands
 
 | Command (internal) | Description | Example Arabic trigger |
 |--------------------|-------------|------------------------|
@@ -183,6 +229,19 @@ Sensitive fields are Fernet-encrypted at rest (key stored in `secret.key`).
 | stream_stop | Stop streaming | أوقف البث |
 | stream_status | Streaming info | حالة البث |
 
+### 4b. Layer 2 — SSH Commands
+
+| Command (internal) | Description | Example Arabic trigger |
+|--------------------|-------------|------------------------|
+| ssh_status | Show tunnel status + connection string | حالة SSH |
+| ssh_exec [cmd] | Run a shell command via SSH | نفّذ عبر SSH dir C:\ |
+| ssh_list [path] | List remote directory via SFTP | اعرض ملفات سطح المكتب عبر SSH |
+| sftp_get [path] | Download file from PC via SFTP | حمّل الملف C:\report.pdf |
+| sftp_put [local] [remote] | Upload file to PC via SFTP | ارفع الملف للحاسب |
+| ssh_bore_port | Show current bore tunnel port | منفذ النفق الحالي |
+
+> **Note:** SSH commands require `ssh.username` to be set in the config. If the field is empty, NexAgent starts normally but all `ssh_*` commands return an Arabic error message.
+
 ---
 
 ## 5. SECURITY MODEL
@@ -220,25 +279,51 @@ Rate limit: 30 messages per 60-second window.
 are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) before saving to disk.  
 The key lives in `%APPDATA%\PCCommander\secret.key` (never committed to git).
 
+**SSH security:** Layer 2 uses public-key authentication only (`PasswordAuthentication no` in sshd_config). The private key never leaves your control device. bore tunnels are ephemeral — a new random port is assigned on each reconnect.
+
 ---
 
 ## 6. ARCHITECTURE
 
-### Startup sequence
+### 6a. Two-Layer Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Your Phone (Telegram)                │
+└───────────────────┬─────────────────────────────────────┘
+                    │ HTTPS (Telegram API)
+        ┌───────────▼───────────┐
+        │   Layer 1: NexAgent   │  ← AI Bot (Python)
+        │   Telegram Bot        │
+        │   GPT-4o / Gemini     │
+        └───────────┬───────────┘
+                    │ Paramiko SSH (127.0.0.1:22)
+        ┌───────────▼───────────┐
+        │   Layer 2: SshRemote  │  ← SSH Tunnel (bore)
+        │   OpenSSH Server      │
+        │   bore → bore.pub:N   │
+        └───────────────────────┘
+                    ▲
+                    │ ssh USER@bore.pub -p N (from anywhere)
+              Your laptop / terminal
+```
+
+### 6b. Startup Sequence
 
 ```
 main.py
   └── PCCommanderService.start()
-        ├── _start_server()       → Flask HTTP server (port 5000)
-        ├── _start_tunnel()       → Cloudflare or ngrok
-        ├── _start_ai()           → OpenAIHandler or GeminiHandler
-        ├── _wire_vision_handler()→ inject VisionHandler into commands module
-        ├── _start_bot()          → PCCommanderBot (runs in daemon thread)
-        ├── _start_scheduler()    → APScheduler (daily report)
+        ├── _start_server()          → Flask HTTP server (port 5000)
+        ├── _start_tunnel()          → Cloudflare or ngrok
+        ├── _start_ai()              → OpenAIHandler or GeminiHandler
+        ├── _wire_vision_handler()   → inject VisionHandler into commands module
+        ├── _wire_ssh_executor()     → inject SSHExecutor into commands module
+        ├── _start_bot()             → PCCommanderBot (daemon thread)
+        ├── _start_scheduler()       → APScheduler (daily report)
         └── _start_network_monitor()
 ```
 
-### Message flow
+### 6c. Message Flow
 
 ```
 User (Telegram)
@@ -252,15 +337,59 @@ _process_text()
       ▼
 execute_command(command, args, config)          ← commands.py dispatcher
       │
-      ├── LocalExecutor (screenshot, processes, files …)
-      └── SmartExecutor (vision_do, vision_task …)
-                │
-                └── VisionHandler → OpenAI GPT-4o Vision
+      ├── LocalExecutor  (screenshot, files, processes …)
+      ├── SmartExecutor  (vision_do, vision_task …)
+      │         └── VisionHandler → OpenAI GPT-4o Vision
+      └── SSHExecutor    (ssh_exec, sftp_get, ssh_status …)
+                └── Paramiko → OpenSSH → bore tunnel → Internet
 ```
 
 ---
 
-## 7. ADDING A NEW COMMAND
+## 7. SSH LAYER (LAYER 2) — DETAILED GUIDE
+
+### 7a. How bore works
+
+```
+bore.exe local 22 --to bore.pub
+  → bore.pub assigns a random port P
+  → All TCP traffic on bore.pub:P is forwarded to localhost:22
+  → sshremote_tunnel_v2.ps1 sends the new port to Telegram and saves it to bore_port.txt
+```
+
+### 7b. Setup steps
+
+1. Fill in `core/sshremote_config.ini`:
+   - `bot_token` — same bot token as Layer 1
+   - `chat_id` — your Telegram Chat ID
+2. Place `bore.exe` in the `core/` folder (download from github.com/ekzhang/bore/releases).
+3. Run `core/setup_v2.bat` **as Administrator**.
+4. Within 30 seconds you will receive a Telegram message like:
+   ```
+   ✅ SshRemote متصل!
+   🖥️ الجهاز: DESKTOP-ABC
+   🔗 للاتصال:
+   ssh USER@bore.pub -p 54321
+   🔑 المفتاح: sshremote_key
+   ```
+5. Set `ssh.username` in `nexagent_config.ini` so the bot can use SSH commands.
+
+### 7c. SSHExecutor — API
+
+| Method | Description |
+|--------|-------------|
+| `connect()` | Open SSH connection |
+| `close()` | Close connection gracefully |
+| `exec_command(cmd)` | Execute shell command, return stdout+stderr |
+| `upload_file(local, remote)` | SFTP put |
+| `download_file(remote)` | SFTP get → bytes |
+| `list_files(path)` | SFTP directory listing |
+| `get_tunnel_port(port_file)` | Read bore_port.txt → port string |
+| `tunnel_status(port_file)` | Human-readable tunnel status |
+
+---
+
+## 8. ADDING A NEW COMMAND
 
 **Step 1 — Add a handler function** in the appropriate `src/pc_control/*.py` module.
 
@@ -286,7 +415,7 @@ def test_my_new_command():
 
 ---
 
-## 8. BUILD & DISTRIBUTION
+## 9. BUILD & DISTRIBUTION
 
 ```bat
 :: From pc-commander\ directory:
@@ -296,9 +425,29 @@ build.bat
 The script:
 1. Installs all `requirements.txt` dependencies via pip.
 2. Generates `assets/icon.ico` using `create_icon.py`.
-3. Runs PyInstaller → produces `dist\PCCommander\PCCommander.exe`.
-4. (Optional) Compiles `installer\setup.iss` with Inno Setup → `dist\installer\NexAgent_V{N}.zip`.
-5. Increments `VERSION` on success.
+3. Runs PyInstaller → produces `dist\NexAgent\NexAgent.exe`.
+4. Assembles release folder with Layer 1 + Layer 2 core files + docs.
+5. Creates `dist\NexAgent_V{N}.zip` (the distributable package).
+6. (Optional) Compiles `installer\setup.iss` with Inno Setup → `dist\installer\NexAgent_Setup_v1.1.0.exe`.
+7. Increments `VERSION` on success.
+
+**Release zip structure:**
+```
+NexAgent_V{N}.zip
+├── NexAgent.exe          ← Layer 1 executable
+├── [PyInstaller runtime files]
+├── core\                 ← Layer 2 files
+│   ├── sshremote_tunnel_v2.ps1
+│   ├── setup_v2.bat
+│   ├── sshremote_key.pub
+│   └── ...
+├── nexagent_config.ini   ← Unified config template
+├── install.bat           ← One-click installer
+├── uninstall.bat
+├── DOCS.md
+├── INSTALL_AR.txt
+└── INSTALL_EN.txt
+```
 
 To bump the version manually:
 ```
@@ -307,7 +456,7 @@ python scripts/bump_version.py
 
 ---
 
-## 9. KNOWN LIMITATIONS
+## 10. KNOWN LIMITATIONS
 
 - **Windows only.** The bot relies on `pywin32`, `pystray`, `pycaw`, and Windows-specific APIs. It will not run on Linux or macOS.
 - **Voice transcription with Gemini** uses `speech_recognition` + Google Web Speech API (requires internet). For offline transcription, use OpenAI Whisper via the OpenAI provider.
@@ -315,30 +464,48 @@ python scripts/bump_version.py
 - **Screen streaming** is LAN-only unless a tunnel is active.
 - **Wake-on-LAN** requires the target machine to support WoL and the router to allow directed broadcasts.
 - **vision_* commands** require OpenAI GPT-4o and will not work with Gemini.
+- **bore.exe** must be downloaded separately and placed in `core/` (Windows-only binary, cannot be bundled cross-platform).
+- **SSH commands** (`ssh_*`, `sftp_*`) require `ssh.username` to be set; if empty, they return a graceful Arabic error and the bot continues normally.
 
 ---
 
-## 10. CHANGELOG
+## 11. CHANGELOG
 
 ### V1.1.0 — NexAgent (2026)
-- Renamed user-facing product name from "PC Commander" to "NexAgent".
+
+**Layer 1 — 13 Bug Fixes:**
 - **FIX-1:** Activated Fernet encryption for bot_token, API keys, PIN, stream password in config.py.
-- **FIX-2:** Unified authorization: all 5 Telegram handlers now use `_check_auth_and_session()`, enforcing PIN everywhere.
-- **FIX-3:** Wired shared `VisionHandler` into `commands.py` via `set_vision_handler()` in `main_service.py`; vision commands no longer instantiate a new handler per call.
-- **FIX-4:** Watchdog `_restart()` now calls `self.stop()` + `time.sleep(2)` + `self.start()` instead of a no-op lambda.
-- **FIX-5:** Fixed socket leak in `watchdog._is_internet_available()` — now uses `with socket.socket(...) as s`.
-- **FIX-6:** Fixed `asyncio.run()` in `bot.stop()` — replaced with event-loop-aware call using `loop.call_soon_threadsafe`.
-- **FIX-7:** Deleted dead `src/security/auth.py` (conflicted with `security_auth.py`).
-- **FIX-8:** Updated Gemini model from deprecated `gemini-pro` to `gemini-1.5-flash` in config, GeminiHandler, and `_start_ai()`.
-- **FIX-9:** Refactored `handle_voice` to call shared `_process_text()` instead of mutating `update.message.text`.
+- **FIX-2:** Unified authorization: all 5 Telegram handlers now use `_check_auth_and_session()`.
+- **FIX-3:** Wired shared `VisionHandler` into `commands.py` via `set_vision_handler()`.
+- **FIX-4:** Watchdog `_restart()` now calls `self.stop()` + `time.sleep(2)` + `self.start()`.
+- **FIX-5:** Fixed socket leak in `watchdog._is_internet_available()` — uses `with socket.socket(...) as s`.
+- **FIX-6:** Fixed `asyncio.run()` in `bot.stop()` — replaced with `loop.call_soon_threadsafe`.
+- **FIX-7:** Deleted dead `src/security/auth.py`.
+- **FIX-8:** Updated Gemini model from `gemini-pro` to `gemini-1.5-flash` in all 3 locations.
+- **FIX-9:** Refactored `handle_voice` to call `_process_text()` instead of mutating `update.message.text`.
 - **FIX-10:** Added `pycaw==0.8.0` and `comtypes==1.4.1` to `requirements.txt`.
 - **FIX-11:** Added `.gitignore`; removed `PCCommander_v1.0.0.tar.gz` binary from repo.
 - **FIX-12:** Added `self.ai_handler = None` to `PCCommanderService.__init__()`.
-- **FIX-13:** Added `last_activity` tracking and `_start_context_cleanup()` thread to remove idle conversation contexts after 2 hours.
-- Added `paramiko==3.4.0` to `requirements.txt` (preparation for SSH layer).
-- Added complete test suite: `tests/test_config.py`, `tests/test_security_auth.py`, `tests/test_watchdog.py`, `tests/test_commands.py`.
-- Added `DOCS.md`, `INSTALL_AR.txt`, `INSTALL_EN.txt`.
-- Added `VERSION` file and `scripts/bump_version.py`.
+- **FIX-13:** Added `last_activity` tracking and 2-hour TTL cleanup thread.
+
+**Layer 2 — SSH Integration (SshRemote V2):**
+- Added `src/pc_control/ssh_executor.py` — `SSHExecutor` class (Paramiko wrapper).
+- Added `_wire_ssh_executor()` to `main_service.py` — auto-wires from config.
+- Added 6 SSH bot commands: `ssh_exec`, `ssh_status`, `ssh_list`, `sftp_get`, `sftp_put`, `ssh_bore_port`.
+- Copied SshRemote V2 scripts to `core/` directory.
+- Added `nexagent_config.ini` — unified config for both layers.
+- Updated `installer/setup.iss` — includes Layer 2 as optional install task.
+- Added `install.bat` + `uninstall.bat` — one-click scripts for both layers.
+- Updated `build.bat` — produces zip with Layer 1 + Layer 2 + all docs.
+
+**Testing:**
+- 51 tests total (27 Layer 1 + 24 Layer 2), all passing.
+- New: `tests/test_ssh_executor.py` — 24 tests for SSHExecutor and SSH command routing.
+
+**Documentation:**
+- Added Section 7 (SSH Layer detailed guide).
+- Updated directory structure, architecture diagrams, commands reference, config reference.
+- Updated `INSTALL_AR.txt` + `INSTALL_EN.txt` with Layer 2 setup steps.
 
 ### V1.0.0 — PC Commander (initial release)
 - Telegram bot with GPT-4o / Gemini support.
