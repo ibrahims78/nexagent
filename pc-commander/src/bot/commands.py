@@ -123,6 +123,42 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
             task = " ".join(args) if args else ""
             result_text, result_file = _vision_task(task, config)
 
+        elif command == "autologon_enable":
+            username = args[0] if len(args) > 0 else ""
+            password = args[1] if len(args) > 1 else ""
+            domain   = args[2] if len(args) > 2 else ""
+            if not username or not password:
+                result_text = "⚠️ الاستخدام: autologon_enable <username> <password> [domain]"
+            else:
+                from src.pc_control.autologon import setup_autologon
+                result_text = setup_autologon(username, password, domain)
+
+        elif command == "autologon_disable":
+            from src.pc_control.autologon import disable_autologon
+            result_text = disable_autologon()
+
+        elif command == "autologon_status":
+            from src.pc_control.autologon import is_autologon_enabled, get_current_username
+            enabled = is_autologon_enabled()
+            user    = get_current_username()
+            status  = "✅ مفعّل" if enabled else "❌ غير مفعّل"
+            result_text = (
+                f"🔑 **حالة Autologon**\n\n"
+                f"الحالة: {status}\n"
+                f"المستخدم: `{user}`"
+            )
+
+        elif command == "pre_login_status":
+            import subprocess
+            r = subprocess.run(
+                ["schtasks", "/query", "/tn", "PCCommander_PreLogin", "/fo", "LIST"],
+                capture_output=True, text=True, encoding="utf-8", errors="ignore"
+            )
+            if r.returncode == 0:
+                result_text = "✅ **Pre-Login Agent مثبّت**\nيعمل تلقائياً عند كل إقلاع."
+            else:
+                result_text = "❌ **Pre-Login Agent غير مثبّت**\nافتح الإعدادات ← تسجيل الدخول لتثبيته."
+
         elif command == "chat":
             result_text = args[0] if args else ""
 

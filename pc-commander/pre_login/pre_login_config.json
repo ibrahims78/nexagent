@@ -1,0 +1,8 @@
+{
+  "bot_token": "ضع_هنا_نفس_token_البوت_الرئيسي",
+  "allowed_users": [],
+  "notify_on_boot": true,
+  "auto_login_enabled": false,
+  "wait_for_command": true,
+  "command_timeout": 300
+}

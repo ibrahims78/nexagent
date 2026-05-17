@@ -60,13 +60,14 @@ class SettingsWindow(ctk.CTk):
         self.tabview = ctk.CTkTabview(self, corner_radius=10)
         self.tabview.grid(row=1, column=0, padx=15, pady=10, sticky="nsew")
 
-        for tab in ["تيليغرام", "الذكاء الاصطناعي", "الاتصال", "إيقاظ الحاسب", "الإعدادات", "المراقبة", "السجلات"]:
+        for tab in ["تيليغرام", "الذكاء الاصطناعي", "الاتصال", "إيقاظ الحاسب", "تسجيل الدخول", "الإعدادات", "المراقبة", "السجلات"]:
             self.tabview.add(tab)
 
         self._build_telegram_tab()
         self._build_ai_tab()
         self._build_tunnel_tab()
         self._build_wol_tab()
+        self._build_login_tab()
         self._build_settings_tab()
         self._build_monitoring_tab()
         self._build_logs_tab()
@@ -385,6 +386,191 @@ class SettingsWindow(ctk.CTk):
             text="💡 راجع ملف SETUP_ANDROID_AR.txt لإعداد الهاتف الاحتياطي",
             font=ctk.CTkFont(size=11), text_color="#888"
         ).pack(pady=5)
+
+    def _build_login_tab(self):
+        tab = self.tabview.tab("تسجيل الدخول")
+        tab.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(tab, text="إدارة تسجيل الدخول",
+                     font=ctk.CTkFont(size=15, weight="bold")).pack(pady=(15, 5))
+        ctk.CTkLabel(
+            tab,
+            text="تحكم في طريقة دخول ويندوز عند الإقلاع",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).pack(pady=(0, 10))
+
+        autologon_frame = ctk.CTkFrame(tab)
+        autologon_frame.pack(fill="x", padx=20, pady=5)
+        autologon_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            autologon_frame,
+            text="🔑  Autologon (تسجيل دخول تلقائي)",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        ctk.CTkLabel(
+            autologon_frame,
+            text="أداة Microsoft الرسمية - تدخل ويندوز تلقائياً عند الإقلاع",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 8), sticky="w")
+
+        ctk.CTkLabel(autologon_frame, text="اسم المستخدم:", width=150, anchor="w").grid(row=2, column=0, padx=10, pady=6)
+        self.autologon_user_var = ctk.StringVar()
+        from src.pc_control.autologon import get_current_username
+        self.autologon_user_var.set(get_current_username())
+        ctk.CTkEntry(autologon_frame, textvariable=self.autologon_user_var,
+                     placeholder_text="اسم مستخدم ويندوز").grid(row=2, column=1, padx=10, pady=6, sticky="ew")
+
+        ctk.CTkLabel(autologon_frame, text="كلمة المرور:", width=150, anchor="w").grid(row=3, column=0, padx=10, pady=6)
+        self.autologon_pass_var = ctk.StringVar()
+        ctk.CTkEntry(autologon_frame, textvariable=self.autologon_pass_var,
+                     show="●", placeholder_text="كلمة مرور ويندوز").grid(row=3, column=1, padx=10, pady=6, sticky="ew")
+
+        ctk.CTkLabel(autologon_frame, text="Domain (اختياري):", width=150, anchor="w").grid(row=4, column=0, padx=10, pady=6)
+        self.autologon_domain_var = ctk.StringVar()
+        from src.pc_control.autologon import get_current_domain
+        self.autologon_domain_var.set(get_current_domain())
+        ctk.CTkEntry(autologon_frame, textvariable=self.autologon_domain_var,
+                     placeholder_text="WORKGROUP أو اسم النطاق").grid(row=4, column=1, padx=10, pady=6, sticky="ew")
+
+        btn_row = ctk.CTkFrame(autologon_frame, fg_color="transparent")
+        btn_row.grid(row=5, column=0, columnspan=2, pady=10)
+
+        ctk.CTkButton(
+            btn_row, text="✅ تفعيل Autologon", width=180,
+            fg_color="#2e7d32", hover_color="#1b5e20",
+            command=self._enable_autologon
+        ).pack(side="left", padx=8)
+        ctk.CTkButton(
+            btn_row, text="❌ تعطيل Autologon", width=180,
+            fg_color="#c62828", hover_color="#b71c1c",
+            command=self._disable_autologon
+        ).pack(side="left", padx=8)
+
+        self.autologon_status_label = ctk.CTkLabel(autologon_frame, text="", font=ctk.CTkFont(size=12))
+        self.autologon_status_label.grid(row=6, column=0, columnspan=2, pady=5)
+
+        self._refresh_autologon_status()
+
+        pre_login_frame = ctk.CTkFrame(tab)
+        pre_login_frame.pack(fill="x", padx=20, pady=10)
+        pre_login_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            pre_login_frame,
+            text="📲  Pre-Login Agent (إشعار عند الإقلاع)",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="w")
+        ctk.CTkLabel(
+            pre_login_frame,
+            text="يرسل إشعاراً لتيليغرام عند كل إقلاع - يمكنك تسجيل الدخول عن بُعد",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 8), sticky="w")
+
+        btn_row2 = ctk.CTkFrame(pre_login_frame, fg_color="transparent")
+        btn_row2.grid(row=2, column=0, columnspan=2, pady=8)
+
+        ctk.CTkButton(
+            btn_row2, text="⚙️ تثبيت Pre-Login Agent", width=210,
+            fg_color="#1565c0", hover_color="#0d47a1",
+            command=self._install_pre_login
+        ).pack(side="left", padx=8)
+        ctk.CTkButton(
+            btn_row2, text="🗑️ إلغاء التثبيت", width=150,
+            fg_color="#555", hover_color="#444",
+            command=self._uninstall_pre_login
+        ).pack(side="left", padx=8)
+
+        self.pre_login_status_label = ctk.CTkLabel(
+            pre_login_frame, text="", font=ctk.CTkFont(size=12), text_color="#aaa"
+        )
+        self.pre_login_status_label.grid(row=3, column=0, columnspan=2, pady=5)
+
+        ctk.CTkLabel(
+            tab,
+            text="💡 للاستخدام الأمثل: فعّل Autologon + ثبّت Pre-Login Agent معاً",
+            font=ctk.CTkFont(size=11), text_color="#66bb6a"
+        ).pack(pady=8)
+
+    def _refresh_autologon_status(self):
+        try:
+            from src.pc_control.autologon import is_autologon_enabled
+            if is_autologon_enabled():
+                self.autologon_status_label.configure(
+                    text="✅ Autologon مفعّل حالياً", text_color="#66bb6a"
+                )
+            else:
+                self.autologon_status_label.configure(
+                    text="⏸️ Autologon غير مفعّل", text_color="#aaa"
+                )
+        except Exception:
+            self.autologon_status_label.configure(text="", text_color="#aaa")
+
+    def _enable_autologon(self):
+        username = self.autologon_user_var.get().strip()
+        password = self.autologon_pass_var.get()
+        domain   = self.autologon_domain_var.get().strip()
+        if not username or not password:
+            self.autologon_status_label.configure(
+                text="⚠️ أدخل اسم المستخدم وكلمة المرور", text_color="#ffb300"
+            )
+            return
+        self.autologon_status_label.configure(text="⏳ جاري الضبط...", text_color="#aaa")
+        self.update()
+        def setup():
+            from src.pc_control.autologon import setup_autologon
+            result = setup_autologon(username, password, domain)
+            self.autologon_status_label.configure(
+                text=result[:80],
+                text_color="#66bb6a" if "✅" in result else "#ef5350"
+            )
+            self.autologon_pass_var.set("")
+        threading.Thread(target=setup, daemon=True).start()
+
+    def _disable_autologon(self):
+        self.autologon_status_label.configure(text="⏳ جاري الإلغاء...", text_color="#aaa")
+        self.update()
+        def disable():
+            from src.pc_control.autologon import disable_autologon
+            result = disable_autologon()
+            self.autologon_status_label.configure(
+                text=result,
+                text_color="#66bb6a" if "✅" in result else "#ef5350"
+            )
+        threading.Thread(target=disable, daemon=True).start()
+
+    def _install_pre_login(self):
+        import subprocess
+        from pathlib import Path
+        bat = Path(__file__).parents[3] / "pre_login" / "install_pre_login.bat"
+        if not bat.exists():
+            self.pre_login_status_label.configure(
+                text="❌ ملف install_pre_login.bat غير موجود", text_color="#ef5350"
+            )
+            return
+        try:
+            subprocess.Popen(
+                ["powershell", "-Command", f"Start-Process '{bat}' -Verb RunAs"],
+                shell=True
+            )
+            self.pre_login_status_label.configure(
+                text="🚀 تم فتح نافذة التثبيت (تأكد من الموافقة)", text_color="#66bb6a"
+            )
+        except Exception as e:
+            self.pre_login_status_label.configure(text=f"❌ {e}", text_color="#ef5350")
+
+    def _uninstall_pre_login(self):
+        import subprocess
+        try:
+            subprocess.run(
+                ["schtasks", "/delete", "/tn", "PCCommander_PreLogin", "/f"],
+                capture_output=True, timeout=10
+            )
+            self.pre_login_status_label.configure(
+                text="✅ تم إلغاء التثبيت", text_color="#66bb6a"
+            )
+        except Exception as e:
+            self.pre_login_status_label.configure(text=f"❌ {e}", text_color="#ef5350")
 
     def _build_monitoring_tab(self):
         tab = self.tabview.tab("المراقبة")
