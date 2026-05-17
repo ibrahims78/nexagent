@@ -6,11 +6,20 @@ from pathlib import Path
 # Shared VisionHandler instance injected by main_service (FIX-3)
 _vision_handler = None
 
+# Shared SSHExecutor instance injected by main_service (SSH Layer 2)
+_ssh_executor = None
+
 
 def set_vision_handler(handler) -> None:
     """Register the shared VisionHandler so vision commands can use it."""
     global _vision_handler
     _vision_handler = handler
+
+
+def set_ssh_executor(executor) -> None:
+    """Register the shared SSHExecutor so SSH commands can use it."""
+    global _ssh_executor
+    _ssh_executor = executor
 
 
 def execute_command(command: str, args: list, config: dict) -> tuple:
@@ -295,6 +304,85 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
 
         elif command == "chat":
             result_text = args[0] if args else ""
+
+        # ------------------------------------------------------------------
+        # SSH Layer 2 commands — routed through SSHExecutor
+        # ------------------------------------------------------------------
+
+        elif command == "ssh_exec":
+            if _ssh_executor is None:
+                result_text = "❌ SSH غير مهيأ. تحقق من إعدادات [ssh] في النظام."
+            else:
+                cmd = " ".join(args) if args else ""
+                if not cmd:
+                    result_text = "⚠️ الاستخدام: ssh_exec <command>"
+                else:
+                    result_text = _ssh_executor.exec_command(cmd)
+
+        elif command == "ssh_status":
+            if _ssh_executor is None:
+                result_text = "❌ SSH غير مهيأ."
+            else:
+                bore_port_file = config.get("ssh", {}).get(
+                    "bore_port_file", r"C:\SshRemote_V2\bore_port.txt"
+                )
+                result_text = _ssh_executor.tunnel_status(bore_port_file)
+
+        elif command == "ssh_list":
+            if _ssh_executor is None:
+                result_text = "❌ SSH غير مهيأ."
+            else:
+                path = args[0] if args else "."
+                result_text = _ssh_executor.list_files(path)
+
+        elif command == "sftp_get":
+            if _ssh_executor is None:
+                result_text = "❌ SSH غير مهيأ."
+            else:
+                remote_path = args[0] if args else ""
+                if not remote_path:
+                    result_text = "⚠️ الاستخدام: sftp_get <remote_path>"
+                else:
+                    data = _ssh_executor.download_file(remote_path)
+                    if data is None:
+                        result_text = f"❌ فشل تنزيل الملف: `{remote_path}`"
+                    else:
+                        from src.utils.config import get_config_dir
+                        filename = remote_path.replace("\\", "/").split("/")[-1]
+                        out = get_config_dir() / "downloads" / filename
+                        out.parent.mkdir(parents=True, exist_ok=True)
+                        out.write_bytes(data)
+                        result_file = str(out)
+                        result_text = f"✅ تم تنزيل الملف: `{filename}` ({len(data):,} bytes)"
+
+        elif command == "sftp_put":
+            if _ssh_executor is None:
+                result_text = "❌ SSH غير مهيأ."
+            else:
+                local_path = args[0] if args else ""
+                remote_path = args[1] if len(args) > 1 else ""
+                if not local_path or not remote_path:
+                    result_text = "⚠️ الاستخدام: sftp_put <local_path> <remote_path>"
+                else:
+                    result_text = _ssh_executor.upload_file(local_path, remote_path)
+
+        elif command == "ssh_bore_port":
+            if _ssh_executor is None:
+                result_text = "❌ SSH غير مهيأ."
+            else:
+                bore_port_file = config.get("ssh", {}).get(
+                    "bore_port_file", r"C:\SshRemote_V2\bore_port.txt"
+                )
+                port = _ssh_executor.get_tunnel_port(bore_port_file)
+                if port:
+                    bore_server = config.get("bore", {}).get("bore_server", "bore.pub")
+                    result_text = (
+                        f"🔗 **منفذ النفق الحالي:**\n\n"
+                        f"`{port}`\n\n"
+                        f"للاتصال:\n`ssh USER@{bore_server} -p {port}`"
+                    )
+                else:
+                    result_text = "❌ لا يوجد منفذ نشط. تأكد من تشغيل النفق على الجهاز."
 
         else:
             result_text = f"⚠️ أمر غير معروف: {command}"

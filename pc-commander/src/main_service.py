@@ -16,6 +16,7 @@ class PCCommanderService:
         self.network_monitor = None
         self.server_thread = None
         self.ai_handler = None  # FIX-12: initialise before _start_ai()
+        self._ssh_executor = None
         self._running = False
 
     def start(self, config: dict):
@@ -29,6 +30,7 @@ class PCCommanderService:
             self._start_tunnel()
             self._start_ai()
             self._wire_vision_handler()  # FIX-3: share VisionHandler with commands
+            self._wire_ssh_executor()   # SSH Layer 2: share SSHExecutor with commands
             self._start_bot()
             self._start_scheduler()
             self._start_network_monitor()
@@ -90,6 +92,29 @@ class PCCommanderService:
         except Exception as e:
             logger.warning(f"VisionHandler not wired (non-fatal): {e}")
 
+    def _wire_ssh_executor(self):
+        """Instantiate SSHExecutor from config and share with commands module."""
+        ssh_cfg = self.config.get("ssh", {})
+        username = ssh_cfg.get("username", "")
+        if not username:
+            logger.warning("SSH layer disabled — ssh.username not set in config")
+            return
+        try:
+            from src.pc_control.ssh_executor import SSHExecutor
+            from src.bot.commands import set_ssh_executor
+            executor = SSHExecutor(
+                username=username,
+                key_path=ssh_cfg.get("key_path") or None,
+                password=ssh_cfg.get("password") or None,
+                host=ssh_cfg.get("host", "127.0.0.1"),
+                port=int(ssh_cfg.get("port", 22)),
+            )
+            set_ssh_executor(executor)
+            self._ssh_executor = executor
+            logger.info(f"SSHExecutor wired (user={username})")
+        except Exception as e:
+            logger.warning(f"SSHExecutor not wired (non-fatal): {e}")
+
     def _start_bot(self):
         from src.bot.telegram_bot import PCCommanderBot
         self.bot = PCCommanderBot(
@@ -123,6 +148,8 @@ class PCCommanderService:
             self.bot.stop()
         if self.tunnel:
             self.tunnel.stop()
+        if self._ssh_executor:
+            self._ssh_executor.close()
         self._running = False
         logger.info("All services stopped")
 
