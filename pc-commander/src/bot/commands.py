@@ -189,6 +189,41 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
             else:
                 result_text = "⏸️ **بث الشاشة متوقف**\nأرسل /stream_start لتشغيله"
 
+        elif command == "security_report":
+            from src.utils.security_auth import get_security_report
+            result_text = get_security_report(config)
+
+        elif command == "security_block":
+            uid_str = args[0] if args else ""
+            if uid_str.isdigit():
+                from src.utils.security_auth import block_user
+                block_user(int(uid_str))
+                result_text = f"🚫 تم حجب المستخدم {uid_str}"
+            else:
+                result_text = "⚠️ أرسل User ID صحيح"
+
+        elif command == "security_unblock":
+            uid_str = args[0] if args else ""
+            if uid_str.isdigit():
+                from src.utils.security_auth import unblock_user
+                unblock_user(int(uid_str))
+                result_text = f"✅ تم رفع الحجب عن {uid_str}"
+            else:
+                result_text = "⚠️ أرسل User ID صحيح"
+
+        elif command == "watchdog_status":
+            from src.utils.watchdog import is_running as wd_running
+            result_text = (
+                "🐕 **Watchdog يعمل**\nيراقب البوت والإنترنت تلقائياً."
+                if wd_running() else
+                "❌ **Watchdog متوقف**"
+            )
+
+        elif command == "logout":
+            from src.utils.security_auth import invalidate_session
+            invalidate_session(args[0] if args else 0)
+            result_text = "🔒 تم إنهاء الجلسة"
+
         elif command == "chat":
             result_text = args[0] if args else ""
 

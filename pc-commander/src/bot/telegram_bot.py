@@ -11,6 +11,10 @@ from telegram.ext import (
 )
 from src.utils.logger import get_logger, log_command
 from src.bot.commands import execute_command
+from src.utils.security_auth import (
+    check_authorization, request_pin_auth, verify_pin,
+    is_waiting_pin, create_session, get_security_report
+)
 
 logger = get_logger()
 
@@ -37,15 +41,49 @@ class PCCommanderBot:
 
     def is_authorized(self, user_id: int) -> bool:
         if not self.allowed_users:
-            return True
+            return False
         return user_id in self.allowed_users
+
+    async def _check_auth_and_session(self, update: Update) -> bool:
+        """يتحقق من الصلاحية والجلسة - يُرجع True إذا مسموح بالمتابعة"""
+        user = update.effective_user
+        uid  = user.id
+        allowed, reason = check_authorization(uid, self.config)
+
+        if not allowed:
+            if reason == "NOT_ALLOWED":
+                await update.message.reply_text("⛔ غير مصرح لك باستخدام هذا البوت.")
+                if self.config.get("security", {}).get("notify_on_unauthorized", True):
+                    for admin in self.allowed_users:
+                        try:
+                            await self.app.bot.send_message(
+                                admin,
+                                f"⚠️ **تنبيه أمني**\nمحاولة وصول غير مصرح:\n"
+                                f"ID: `{uid}`\nاسم: {user.full_name}\n"
+                                f"@{user.username or 'بدون username'}"
+                            )
+                        except Exception:
+                            pass
+            elif reason == "BLOCKED":
+                await update.message.reply_text("🚫 تم حجبك. تواصل مع المسؤول.")
+            elif reason == "RATE_LIMITED":
+                await update.message.reply_text("⏳ أرسلت أوامر كثيرة. انتظر دقيقة.")
+            elif reason == "NO_SESSION":
+                status = request_pin_auth(uid, self.config)
+                if status == "SESSION_CREATED":
+                    return True
+                await update.message.reply_text(
+                    "🔐 **مطلوب رمز PIN للدخول**\n\n"
+                    "أرسل الرمز السري للمتابعة.\n"
+                    "⚠️ تنتهي المهلة خلال دقيقتين."
+                )
+            return False
+        return True
 
     async def _unauthorized_message(self, update: Update):
         user = update.effective_user
         logger.warning(f"محاولة وصول غير مصرح: {user.id} (@{user.username})")
-        await update.message.reply_text(
-            "⛔ غير مصرح لك باستخدام هذا البوت."
-        )
+        await update.message.reply_text("⛔ غير مصرح لك باستخدام هذا البوت.")
         if self.config.get("security", {}).get("notify_on_unauthorized", True):
             for uid in self.allowed_users:
                 try:
@@ -108,12 +146,33 @@ class PCCommanderBot:
         await update.message.reply_text(help_text, parse_mode="Markdown")
 
     async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.is_authorized(update.effective_user.id):
-            await self._unauthorized_message(update)
+        user_id = update.effective_user.id
+        text    = update.message.text
+
+        if is_waiting_pin(user_id):
+            result = verify_pin(user_id, text, self.config)
+            try:
+                await update.message.delete()
+            except Exception:
+                pass
+            if result == "OK":
+                await update.message.reply_text(
+                    "✅ **تم التحقق بنجاح!**\nمرحباً، الجلسة نشطة الآن.",
+                    parse_mode="Markdown"
+                )
+            elif result.startswith("WRONG:"):
+                remaining = result.split(":")[1]
+                await update.message.reply_text(
+                    f"❌ رمز خاطئ. المحاولات المتبقية: {remaining}"
+                )
+            elif result == "BLOCKED":
+                await update.message.reply_text("🚫 تم حجبك بسبب محاولات متكررة.")
+            elif result == "EXPIRED":
+                await update.message.reply_text("⏰ انتهت المهلة. أرسل أمراً جديداً لطلب PIN.")
             return
 
-        user_id = update.effective_user.id
-        text = update.message.text
+        if not await self._check_auth_and_session(update):
+            return
 
         if self.config.get("general", {}).get("do_not_disturb", False):
             await update.message.reply_text("🌙 وضع عدم الإزعاج مفعّل. سيتم تنفيذ الأمر لاحقاً.")
@@ -286,6 +345,16 @@ class PCCommanderBot:
             BotCommand("start", "القائمة الرئيسية"),
             BotCommand("help", "قائمة الأوامر"),
         ])
+
+        if self.config.get("security", {}).get("watchdog_enabled", True):
+            from src.utils.watchdog import start_watchdog
+            def _get_bot():
+                return self.app.bot if self.app else None
+            def _get_config():
+                return self.config
+            def _restart():
+                pass
+            start_watchdog(_get_bot, _get_config, _restart)
 
         logger.info("✅ البوت يعمل...")
         await self.app.run_polling(drop_pending_updates=True)

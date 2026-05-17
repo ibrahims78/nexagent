@@ -52,7 +52,10 @@ DEFAULT_CONFIG = {
     },
     "security": {
         "log_commands": True,
-        "notify_on_unauthorized": True
+        "notify_on_unauthorized": True,
+        "require_pin": False,
+        "session_pin": "",
+        "watchdog_enabled": True
     },
     "stream": {
         "enabled": False,

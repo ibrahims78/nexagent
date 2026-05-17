@@ -291,6 +291,12 @@ class SettingsWindow(ctk.CTk):
             variable=self.daily_report_var, font=ctk.CTkFont(size=13)
         ).pack(padx=15, pady=5, anchor="w")
 
+        self.watchdog_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            frame, text="🐕 Watchdog - مراقبة البوت وإعادة تشغيله تلقائياً",
+            variable=self.watchdog_var, font=ctk.CTkFont(size=13)
+        ).pack(padx=15, pady=5, anchor="w")
+
         time_frame = ctk.CTkFrame(tab)
         time_frame.pack(fill="x", padx=20, pady=5)
 
@@ -298,6 +304,36 @@ class SettingsWindow(ctk.CTk):
         self.report_time_var = ctk.StringVar(value="08:00")
         ctk.CTkEntry(time_frame, textvariable=self.report_time_var, width=100,
                      placeholder_text="HH:MM").pack(side="left", padx=10)
+
+        sec_frame = ctk.CTkFrame(tab)
+        sec_frame.pack(fill="x", padx=20, pady=10)
+        sec_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            sec_frame, text="🔒  أمان الجلسة (PIN)",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).grid(row=0, column=0, columnspan=3, padx=10, pady=(10, 4), sticky="w")
+        ctk.CTkLabel(
+            sec_frame,
+            text="يطلب رمزاً سرياً من كل مستخدم عند بدء كل جلسة - طبقة حماية إضافية",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 8), sticky="w")
+
+        self.require_pin_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            sec_frame, text="تفعيل طلب PIN عند كل جلسة جديدة",
+            variable=self.require_pin_var, font=ctk.CTkFont(size=12)
+        ).grid(row=2, column=0, columnspan=3, padx=15, pady=5, sticky="w")
+
+        ctk.CTkLabel(sec_frame, text="رمز PIN:", width=120, anchor="w").grid(row=3, column=0, padx=10, pady=6)
+        self.session_pin_var = ctk.StringVar()
+        ctk.CTkEntry(sec_frame, textvariable=self.session_pin_var,
+                     show="●", placeholder_text="رمز سري (4-8 أرقام)").grid(row=3, column=1, padx=10, pady=6, sticky="ew")
+        ctk.CTkLabel(
+            sec_frame,
+            text="💡 ينتهي بعد 60 دقيقة خمول  •  3 محاولات خاطئة = حجب تلقائي",
+            font=ctk.CTkFont(size=10), text_color="#666"
+        ).grid(row=4, column=0, columnspan=3, padx=10, pady=(0, 8), sticky="w")
 
     def _build_wol_tab(self):
         tab = self.tabview.tab("إيقاظ الحاسب")
@@ -762,6 +798,9 @@ class SettingsWindow(ctk.CTk):
         self.dnd_var.set(cfg["general"].get("do_not_disturb", False))
         self.log_commands_var.set(cfg["security"].get("log_commands", True))
         self.notify_unauth_var.set(cfg["security"].get("notify_on_unauthorized", True))
+        self.watchdog_var.set(cfg["security"].get("watchdog_enabled", True))
+        self.require_pin_var.set(cfg["security"].get("require_pin", False))
+        self.session_pin_var.set(cfg["security"].get("session_pin", ""))
         self.daily_report_var.set(cfg["general"].get("daily_report_enabled", True))
         self.report_time_var.set(cfg["general"].get("daily_report_time", "08:00"))
         mon = cfg.get("monitoring", {})
@@ -799,6 +838,9 @@ class SettingsWindow(ctk.CTk):
         self.config["general"]["daily_report_time"] = self.report_time_var.get().strip()
         self.config["security"]["log_commands"] = self.log_commands_var.get()
         self.config["security"]["notify_on_unauthorized"] = self.notify_unauth_var.get()
+        self.config["security"]["watchdog_enabled"] = self.watchdog_var.get()
+        self.config["security"]["require_pin"] = self.require_pin_var.get()
+        self.config["security"]["session_pin"] = self.session_pin_var.get().strip()
         self.config["monitoring"]["cpu_alert_threshold"] = self.monitor_vars["cpu_alert"].get()
         self.config["monitoring"]["ram_alert_threshold"] = self.monitor_vars["ram_alert"].get()
         self.config["monitoring"]["disk_alert_threshold"] = self.monitor_vars["disk_alert"].get()
