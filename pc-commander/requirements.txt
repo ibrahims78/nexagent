@@ -20,3 +20,6 @@ plyer==2.1.0
 pyperclip==1.8.2
 keyboard==0.13.5
 mouse==0.7.1
+pycaw==0.8.0
+comtypes==1.4.1
+paramiko==3.4.0

@@ -1,39 +1,43 @@
 @echo off
 chcp 65001 >nul
-title PC Commander - Build Script
+title NexAgent - Build Script
 color 0A
+
+:: Read current version from VERSION file
+set /p VER=<VERSION
+if "%VER%"=="" set VER=1
 
 echo.
 echo  ╔══════════════════════════════════════╗
-echo  ║      PC Commander Build Script       ║
-echo  ║              v1.0.0                  ║
+echo  ║        NexAgent Build Script         ║
+echo  ║              V%VER%                        ║
 echo  ╚══════════════════════════════════════╝
 echo.
 
 :: Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo  [ERROR] Python غير مثبت. قم بتثبيته من python.org
+    echo  [ERROR] Python not found. Install from python.org and add to PATH.
     pause
     exit /b 1
 )
 
-echo  [1/5] تثبيت المتطلبات...
+echo  [1/5] Installing dependencies...
 pip install -r requirements.txt --quiet
 if errorlevel 1 (
-    echo  [ERROR] فشل تثبيت المتطلبات
+    echo  [ERROR] Dependency installation failed.
     pause
     exit /b 1
 )
-echo  [OK] تم تثبيت المتطلبات
+echo  [OK] Dependencies installed
 
 echo.
-echo  [2/5] إنشاء الأيقونة...
+echo  [2/5] Creating icon...
 python create_icon.py
-echo  [OK] تم إنشاء الأيقونة
+echo  [OK] Icon created
 
 echo.
-echo  [3/5] بناء الملف التنفيذي...
+echo  [3/5] Building executable...
 pyinstaller --noconfirm ^
     --onedir ^
     --windowed ^
@@ -53,46 +57,55 @@ pyinstaller --noconfirm ^
     --hidden-import "psutil" ^
     --hidden-import "pyautogui" ^
     --hidden-import "cryptography" ^
+    --hidden-import "pycaw" ^
+    --hidden-import "comtypes" ^
+    --hidden-import "paramiko" ^
     --collect-all "customtkinter" ^
     --collect-all "pystray" ^
     main.py
 
 if errorlevel 1 (
-    echo  [ERROR] فشل بناء الملف التنفيذي
+    echo  [ERROR] Build failed.
     pause
     exit /b 1
 )
-echo  [OK] تم بناء الملف التنفيذي
+echo  [OK] Executable built
 
 echo.
-echo  [4/5] إنشاء ملف الترخيص...
-echo PC Commander v1.0.0 > dist\PCCommander\LICENSE.txt
-echo برنامج مجاني للاستخدام الشخصي >> dist\PCCommander\LICENSE.txt
-copy dist\PCCommander\LICENSE.txt LICENSE.txt >nul
+echo  [4/5] Packaging release...
+:: Create the release zip
+set RELEASE_NAME=NexAgent_V%VER%
+if exist "dist\%RELEASE_NAME%.zip" del "dist\%RELEASE_NAME%.zip"
+powershell -Command "Compress-Archive -Path 'dist\PCCommander\*' -DestinationPath 'dist\%RELEASE_NAME%.zip' -Force"
+if errorlevel 1 (
+    echo  [WARN] Zip packaging failed - executable is still available in dist\PCCommander\
+) else (
+    echo  [OK] Release packaged: %RELEASE_NAME%.zip
+)
 
 echo.
-echo  [5/5] إنشاء حزمة التثبيت...
-:: Check if Inno Setup is installed
+echo  [5/5] Creating installer (Inno Setup)...
 if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" (
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
     if errorlevel 1 (
-        echo  [WARN] فشل إنشاء setup.exe لكن الملف التنفيذي جاهز في dist\PCCommander
+        echo  [WARN] Installer creation failed - zip package is still available
     ) else (
-        echo  [OK] تم إنشاء setup.exe في dist\installer
+        echo  [OK] Installer created in dist\installer\
     )
 ) else (
-    echo  [INFO] Inno Setup غير مثبت - يمكن تشغيل البرنامج مباشرة من dist\PCCommander\PCCommander.exe
-    echo  [INFO] لإنشاء setup.exe قم بتثبيت Inno Setup 6 من jrsoftware.org/isinfo.php
+    echo  [INFO] Inno Setup not found - skipping installer creation
+    echo  [INFO] Install from: jrsoftware.org/isdl.php
 )
+
+:: Increment VERSION on successful build
+python scripts\bump_version.py
 
 echo.
 echo  ╔══════════════════════════════════════╗
-echo  ║         اكتمل البناء بنجاح!          ║
+echo  ║          Build complete!             ║
 echo  ╚══════════════════════════════════════╝
 echo.
-echo  الملف التنفيذي: dist\PCCommander\PCCommander.exe
-if exist "dist\installer\PCCommander_Setup_v1.0.0.exe" (
-    echo  حزمة التثبيت: dist\installer\PCCommander_Setup_v1.0.0.exe
-)
+echo  Executable:  dist\PCCommander\PCCommander.exe
+echo  Release zip: dist\NexAgent_V%VER%.zip
 echo.
 pause

@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.tar.gz
+*.zip
+*.exe
+dist/
+build/
+*.spec
+.camoufox-cli/
+secret.key
+config.json
+*.log
+.env
+.venv/
+venv/

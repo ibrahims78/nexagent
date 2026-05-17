@@ -3,9 +3,25 @@ import sys
 import json
 from pathlib import Path
 
+# Shared VisionHandler instance injected by main_service (FIX-3)
+_vision_handler = None
+
+
+def set_vision_handler(handler) -> None:
+    """Register the shared VisionHandler so vision commands can use it."""
+    global _vision_handler
+    _vision_handler = handler
+
 
 def execute_command(command: str, args: list, config: dict) -> tuple:
-    from src.pc_control import screenshot, process_manager, file_manager, word_handler, system_monitor, anydesk
+    """
+    Dispatch a command string to the appropriate PC-control function.
+    Returns (result_text, result_file_path_or_None).
+    """
+    from src.pc_control import (
+        screenshot, process_manager, file_manager,
+        word_handler, system_monitor, anydesk
+    )
 
     result_text = ""
     result_file = None
@@ -108,25 +124,75 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
         elif command == "wol_status":
             result_text = _wol_check_status(config)
 
+        # ------------------------------------------------------------------
+        # Vision commands — use the shared _vision_handler (FIX-3)
+        # ------------------------------------------------------------------
+
         elif command == "vision_do":
-            user_cmd = " ".join(args) if args else ""
-            result_text, result_file = _vision_execute(user_cmd, config)
+            if _vision_handler is None:
+                result_text = "❌ التحكم البصري غير مهيأ. تحقق من مزود الذكاء الاصطناعي."
+            else:
+                from src.pc_control.smart_executor import SmartExecutor
+                result = SmartExecutor(_vision_handler).execute_smart_command(
+                    " ".join(args) if args else ""
+                )
+                actions_summary = "\n".join(result.get("actions_taken", []))
+                result_text = (
+                    f"🧠 **التحكم البصري الذكي**\n\n"
+                    f"📺 الشاشة: {result.get('screen_description', '')[:200]}\n\n"
+                    f"⚡ الإجراءات المنفذة:\n{actions_summary}\n\n"
+                    f"💬 {result.get('response', '')}"
+                )
+                annotated = result.get("annotated_screenshot")
+                if annotated:
+                    from src.utils.config import get_config_dir
+                    from datetime import datetime
+                    screenshots_dir = get_config_dir() / "screenshots"
+                    screenshots_dir.mkdir(exist_ok=True)
+                    result_file = str(
+                        screenshots_dir / f"vision_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    )
+                    with open(result_file, "wb") as fh:
+                        fh.write(annotated)
 
         elif command == "vision_describe":
-            result_text = _vision_describe(config)
+            if _vision_handler is None:
+                result_text = "❌ التحكم البصري غير مهيأ. تحقق من مزود الذكاء الاصطناعي."
+            else:
+                from src.pc_control.smart_executor import SmartExecutor
+                description = SmartExecutor(_vision_handler).describe_current_screen()
+                result_text = f"👁️ **وصف الشاشة الحالية:**\n\n{description}"
 
         elif command == "vision_find_click":
-            element = " ".join(args) if args else ""
-            result_text = _vision_find_click(element, config)
+            if _vision_handler is None:
+                result_text = "❌ التحكم البصري غير مهيأ. تحقق من مزود الذكاء الاصطناعي."
+            else:
+                from src.pc_control.smart_executor import SmartExecutor
+                result_text = SmartExecutor(_vision_handler).find_and_click(
+                    args[0] if args else ""
+                )
 
         elif command == "vision_task":
-            task = " ".join(args) if args else ""
-            result_text, result_file = _vision_task(task, config)
+            if _vision_handler is None:
+                result_text = "❌ التحكم البصري غير مهيأ. تحقق من مزود الذكاء الاصطناعي."
+            else:
+                from src.pc_control.smart_executor import SmartExecutor
+                steps = SmartExecutor(_vision_handler).multi_step_task(
+                    " ".join(args) if args else ""
+                )
+                result_text = (
+                    "🔄 **مهمة ذكية متعددة الخطوات:**\n\n"
+                    + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
+                )
+
+        # ------------------------------------------------------------------
+        # System / security commands
+        # ------------------------------------------------------------------
 
         elif command == "autologon_enable":
             username = args[0] if len(args) > 0 else ""
             password = args[1] if len(args) > 1 else ""
-            domain   = args[2] if len(args) > 2 else ""
+            domain = args[2] if len(args) > 2 else ""
             if not username or not password:
                 result_text = "⚠️ الاستخدام: autologon_enable <username> <password> [domain]"
             else:
@@ -140,8 +206,8 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
         elif command == "autologon_status":
             from src.pc_control.autologon import is_autologon_enabled, get_current_username
             enabled = is_autologon_enabled()
-            user    = get_current_username()
-            status  = "✅ مفعّل" if enabled else "❌ غير مفعّل"
+            user = get_current_username()
+            status = "✅ مفعّل" if enabled else "❌ غير مفعّل"
             result_text = (
                 f"🔑 **حالة Autologon**\n\n"
                 f"الحالة: {status}\n"
@@ -157,7 +223,10 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
             if r.returncode == 0:
                 result_text = "✅ **Pre-Login Agent مثبّت**\nيعمل تلقائياً عند كل إقلاع."
             else:
-                result_text = "❌ **Pre-Login Agent غير مثبّت**\nافتح الإعدادات ← تسجيل الدخول لتثبيته."
+                result_text = (
+                    "❌ **Pre-Login Agent غير مثبّت**\n"
+                    "افتح الإعدادات ← تسجيل الدخول لتثبيته."
+                )
 
         elif command == "stream_start":
             from src.streaming.screen_stream import start_stream, get_stream_status
@@ -236,75 +305,22 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
     return result_text, result_file
 
 
+# ------------------------------------------------------------------
+# Internal helpers
+# ------------------------------------------------------------------
+
 def _wol_check_status(config: dict) -> str:
+    """Ping the PC on port 445 to determine if it is online."""
     import socket
     pc_ip = config.get("wol", {}).get("pc_ip", "")
     if not pc_ip:
         return "❌ لم يتم ضبط IP الحاسب في إعدادات WoL"
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(3)
-        result = s.connect_ex((pc_ip, 445))
-        s.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(3)
+            result = s.connect_ex((pc_ip, 445))
         if result == 0:
             return f"✅ **الحاسب يعمل الآن**\n🌐 IP: `{pc_ip}`"
         return f"❌ **الحاسب مطفأ أو غير متاح**\n🌐 IP: `{pc_ip}`"
     except Exception as e:
         return f"❌ فشل الفحص: {e}"
-
-
-def _get_smart_executor(config: dict):
-    provider = config.get("ai", {}).get("provider", "openai")
-    if provider != "openai":
-        raise RuntimeError("❌ التحكم البصري يتطلب OpenAI (GPT-4o)")
-    key = config.get("ai", {}).get("openai_key", "")
-    if not key:
-        raise RuntimeError("❌ مفتاح OpenAI غير موجود")
-    from src.ai.vision_handler import VisionHandler
-    from src.pc_control.smart_executor import SmartExecutor
-    return SmartExecutor(VisionHandler(api_key=key, model="gpt-4o"))
-
-
-def _vision_execute(user_cmd: str, config: dict) -> tuple:
-    import tempfile, os
-    executor = _get_smart_executor(config)
-    result = executor.execute_smart_command(user_cmd)
-
-    actions_summary = "\n".join(result.get("actions_taken", []))
-    text = (
-        f"🧠 **التحكم البصري الذكي**\n\n"
-        f"📺 الشاشة: {result.get('screen_description', '')[:200]}\n\n"
-        f"⚡ الإجراءات المنفذة:\n{actions_summary}\n\n"
-        f"💬 {result.get('response', '')}"
-    )
-    annotated = result.get("annotated_screenshot")
-    filepath = None
-    if annotated:
-        from src.utils.config import get_config_dir
-        screenshots_dir = get_config_dir() / "screenshots"
-        screenshots_dir.mkdir(exist_ok=True)
-        from datetime import datetime
-        filepath = str(screenshots_dir / f"vision_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
-        with open(filepath, "wb") as f:
-            f.write(annotated)
-    return text, filepath
-
-
-def _vision_describe(config: dict) -> str:
-    executor = _get_smart_executor(config)
-    description = executor.describe_current_screen()
-    return f"👁️ **وصف الشاشة الحالية:**\n\n{description}"
-
-
-def _vision_find_click(element: str, config: dict) -> str:
-    executor = _get_smart_executor(config)
-    return executor.find_and_click(element)
-
-
-def _vision_task(task: str, config: dict) -> tuple:
-    executor = _get_smart_executor(config)
-    steps = executor.multi_step_task(task, max_steps=6)
-    text = f"🔄 **مهمة ذكية متعددة الخطوات:**\n\n" + "\n".join(
-        [f"{i+1}. {s}" for i, s in enumerate(steps)]
-    )
-    return text, None

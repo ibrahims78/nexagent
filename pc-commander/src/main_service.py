@@ -15,25 +15,27 @@ class PCCommanderService:
         self.scheduler = None
         self.network_monitor = None
         self.server_thread = None
+        self.ai_handler = None  # FIX-12: initialise before _start_ai()
         self._running = False
 
     def start(self, config: dict):
         self.config = config
         logger.info("=" * 50)
-        logger.info("🚀 بدء تشغيل PC Commander")
+        logger.info("NexAgent starting")
         logger.info("=" * 50)
 
         try:
             self._start_server()
             self._start_tunnel()
             self._start_ai()
+            self._wire_vision_handler()  # FIX-3: share VisionHandler with commands
             self._start_bot()
             self._start_scheduler()
             self._start_network_monitor()
             self._running = True
-            logger.info("✅ جميع الخدمات تعمل بنجاح")
+            logger.info("All services started successfully")
         except Exception as e:
-            logger.error(f"❌ فشل التشغيل: {e}")
+            logger.error(f"Startup failed: {e}")
             raise
 
     def _start_server(self):
@@ -42,7 +44,7 @@ class PCCommanderService:
         token = secrets.token_urlsafe(16)
         set_secret_token(token)
         self.server_thread = start_server(port=5000)
-        logger.info("✅ السيرفر المحلي يعمل على المنفذ 5000")
+        logger.info("Local HTTP server listening on port 5000")
 
     def _start_tunnel(self):
         provider = self.config["tunnel"].get("provider", "cloudflare")
@@ -58,9 +60,9 @@ class PCCommanderService:
 
         url = self.tunnel.start()
         if url:
-            logger.info(f"✅ النفق يعمل: {url}")
+            logger.info(f"Tunnel active: {url}")
         else:
-            logger.warning("⚠️ فشل تشغيل النفق - سيعمل البوت بدون نفق")
+            logger.warning("Tunnel failed to start - bot will run without tunnel")
 
     def _start_ai(self):
         provider = self.config["ai"].get("provider", "openai")
@@ -74,9 +76,19 @@ class PCCommanderService:
             from src.ai.gemini_handler import GeminiHandler
             self.ai_handler = GeminiHandler(
                 api_key=self.config["ai"]["gemini_key"],
-                model=self.config["ai"].get("model_gemini", "gemini-pro")
+                model=self.config["ai"].get("model_gemini", "gemini-1.5-flash")
             )
-        logger.info(f"✅ الذكاء الاصطناعي: {provider}")
+        logger.info(f"AI provider: {provider}")
+
+    def _wire_vision_handler(self):
+        """Share a single VisionHandler instance with the commands module (FIX-3)."""
+        try:
+            from src.bot.commands import set_vision_handler
+            from src.ai.vision_handler import VisionHandler
+            set_vision_handler(VisionHandler(self.ai_handler))
+            logger.info("VisionHandler wired into commands")
+        except Exception as e:
+            logger.warning(f"VisionHandler not wired (non-fatal): {e}")
 
     def _start_bot(self):
         from src.bot.telegram_bot import PCCommanderBot
@@ -87,22 +99,22 @@ class PCCommanderService:
             config=self.config
         )
         self.bot.start()
-        logger.info("✅ بوت تيليغرام يعمل")
+        logger.info("Telegram bot started")
 
     def _start_scheduler(self):
         from src.scheduler.task_scheduler import TaskScheduler
         self.scheduler = TaskScheduler(bot=self.bot, config=self.config)
         self.scheduler.start()
-        logger.info("✅ المجدول يعمل")
+        logger.info("Scheduler started")
 
     def _start_network_monitor(self):
         from src.utils.network_monitor import NetworkMonitor
         self.network_monitor = NetworkMonitor(bot=self.bot, check_interval=30)
         self.network_monitor.start()
-        logger.info("✅ مراقب الشبكة يعمل")
+        logger.info("Network monitor started")
 
     def stop(self):
-        logger.info("⏹️ إيقاف الخدمات...")
+        logger.info("Stopping all services...")
         if self.network_monitor:
             self.network_monitor.stop()
         if self.scheduler:
@@ -112,7 +124,7 @@ class PCCommanderService:
         if self.tunnel:
             self.tunnel.stop()
         self._running = False
-        logger.info("✅ تم إيقاف جميع الخدمات")
+        logger.info("All services stopped")
 
     def is_running(self) -> bool:
         return self._running

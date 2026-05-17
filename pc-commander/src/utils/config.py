@@ -2,11 +2,20 @@ import json
 import os
 from pathlib import Path
 from cryptography.fernet import Fernet
-import base64
 
 CONFIG_DIR = Path(os.environ.get("APPDATA", ".")) / "PCCommander"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 KEY_FILE = CONFIG_DIR / "secret.key"
+
+# Sensitive fields that are encrypted at rest
+_SENSITIVE_FIELDS = [
+    ("telegram", "bot_token"),
+    ("ai", "openai_key"),
+    ("ai", "gemini_key"),
+    ("tunnel", "ngrok_token"),
+    ("security", "session_pin"),
+    ("stream", "password"),
+]
 
 DEFAULT_CONFIG = {
     "telegram": {
@@ -18,7 +27,7 @@ DEFAULT_CONFIG = {
         "openai_key": "",
         "gemini_key": "",
         "model_openai": "gpt-4o",
-        "model_gemini": "gemini-pro"
+        "model_gemini": "gemini-1.5-flash"
     },
     "tunnel": {
         "provider": "cloudflare",
@@ -68,7 +77,8 @@ DEFAULT_CONFIG = {
 }
 
 
-def get_or_create_key():
+def get_or_create_key() -> bytes:
+    """Return the Fernet key, generating and persisting it if absent."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     if KEY_FILE.exists():
         with open(KEY_FILE, "rb") as f:
@@ -80,6 +90,7 @@ def get_or_create_key():
 
 
 def encrypt_value(value: str) -> str:
+    """Encrypt a plaintext string using the local Fernet key."""
     if not value:
         return value
     key = get_or_create_key()
@@ -88,6 +99,7 @@ def encrypt_value(value: str) -> str:
 
 
 def decrypt_value(value: str) -> str:
+    """Decrypt a Fernet-encrypted string; return value unchanged on failure."""
     if not value:
         return value
     try:
@@ -98,7 +110,19 @@ def decrypt_value(value: str) -> str:
         return value
 
 
+def _get_nested(d: dict, section: str, key: str) -> str:
+    """Safely retrieve a nested config value."""
+    return d.get(section, {}).get(key, "")
+
+
+def _set_nested(d: dict, section: str, key: str, value: str):
+    """Safely set a nested config value."""
+    if section in d:
+        d[section][key] = value
+
+
 def load_config() -> dict:
+    """Load config from disk, decrypting sensitive fields if needed."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     if not CONFIG_FILE.exists():
         save_config(DEFAULT_CONFIG)
@@ -108,12 +132,21 @@ def load_config() -> dict:
             data = json.load(f)
         merged = DEFAULT_CONFIG.copy()
         deep_merge(merged, data)
+
+        # Decrypt sensitive fields only when the file is marked as encrypted
+        if data.get("_encrypted") is True:
+            for section, key in _SENSITIVE_FIELDS:
+                raw = _get_nested(merged, section, key)
+                if raw:
+                    _set_nested(merged, section, key, decrypt_value(raw))
+
         return merged
     except Exception:
         return DEFAULT_CONFIG.copy()
 
 
 def deep_merge(base: dict, override: dict):
+    """Recursively merge override into base in-place."""
     for key, value in override.items():
         if key in base and isinstance(base[key], dict) and isinstance(value, dict):
             deep_merge(base[key], value)
@@ -122,17 +155,32 @@ def deep_merge(base: dict, override: dict):
 
 
 def save_config(config: dict):
+    """Encrypt sensitive fields and persist config to disk."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Work on a deep copy so the in-memory config stays decrypted
+    import copy
+    data = copy.deepcopy(config)
+
+    for section, key in _SENSITIVE_FIELDS:
+        raw = _get_nested(data, section, key)
+        if raw:
+            _set_nested(data, section, key, encrypt_value(raw))
+
+    data["_encrypted"] = True
+
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def get_logs_dir() -> Path:
+    """Return (and create) the logs directory."""
     logs_dir = CONFIG_DIR / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     return logs_dir
 
 
 def get_config_dir() -> Path:
+    """Return (and create) the config directory."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     return CONFIG_DIR

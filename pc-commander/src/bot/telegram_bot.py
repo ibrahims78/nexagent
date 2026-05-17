@@ -3,6 +3,7 @@ import io
 import os
 import sys
 import threading
+import time
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
@@ -35,19 +36,28 @@ class PCCommanderBot:
         self.ai_handler = ai_handler
         self.config = config
         self.app = None
-        self.conversation_context = {}
+        self.conversation_context: dict[int, list] = {}
+        self.last_activity: dict[int, float] = {}
         self._running = False
         self._thread = None
 
+    # ------------------------------------------------------------------
+    # Authorization helpers
+    # ------------------------------------------------------------------
+
     def is_authorized(self, user_id: int) -> bool:
+        """Return True if user_id is in the allowed list (internal helper only)."""
         if not self.allowed_users:
             return False
         return user_id in self.allowed_users
 
     async def _check_auth_and_session(self, update: Update) -> bool:
-        """يتحقق من الصلاحية والجلسة - يُرجع True إذا مسموح بالمتابعة"""
+        """
+        Full authorization gate: whitelist + block + rate-limit + PIN/session.
+        Returns True when the caller may proceed.
+        """
         user = update.effective_user
-        uid  = user.id
+        uid = user.id
         allowed, reason = check_authorization(uid, self.config)
 
         if not allowed:
@@ -80,102 +90,27 @@ class PCCommanderBot:
             return False
         return True
 
-    async def _unauthorized_message(self, update: Update):
-        user = update.effective_user
-        logger.warning(f"محاولة وصول غير مصرح: {user.id} (@{user.username})")
-        await update.message.reply_text("⛔ غير مصرح لك باستخدام هذا البوت.")
-        if self.config.get("security", {}).get("notify_on_unauthorized", True):
-            for uid in self.allowed_users:
-                try:
-                    await self.app.bot.send_message(
-                        uid,
-                        f"⚠️ **تنبيه أمني**\nمحاولة وصول غير مصرح من:\n"
-                        f"ID: `{user.id}`\nاسم: {user.full_name}\n"
-                        f"@{user.username or 'بدون username'}"
-                    )
-                except Exception:
-                    pass
+    # ------------------------------------------------------------------
+    # Shared text-processing core (FIX-9)
+    # ------------------------------------------------------------------
 
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.is_authorized(update.effective_user.id):
-            await self._unauthorized_message(update)
-            return
-
-        keyboard = []
-        row = []
-        for i, (label, _) in enumerate(QUICK_COMMANDS_AR):
-            row.append(InlineKeyboardButton(label, callback_data=f"quick_{i}"))
-            if len(row) == 2:
-                keyboard.append(row)
-                row = []
-        if row:
-            keyboard.append(row)
-
-        markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            "🖥️ **PC Commander**\n\n"
-            "مرحباً! أنا هنا للتحكم بحاسبك.\n"
-            "يمكنك إرسال أمر نصي أو صوتي، أو استخدام الأزرار أدناه:\n\n"
-            "💡 **أمثلة:**\n"
-            "• افتح المتصفح\n"
-            "• خذ لقطة شاشة\n"
-            "• أرسلي حالة الحاسب\n"
-            "• اغلق الحاسب بعد 30 دقيقة",
-            reply_markup=markup,
-            parse_mode="Markdown"
-        )
-
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.is_authorized(update.effective_user.id):
-            await self._unauthorized_message(update)
-            return
-
-        help_text = (
-            "📖 **قائمة الأوامر المتاحة:**\n\n"
-            "🖼️ `لقطة شاشة` - أخذ صورة للشاشة\n"
-            "📊 `حالة الحاسب` - عرض CPU/RAM/قرص\n"
-            "📁 `الملفات` - تصفح الملفات\n"
-            "🔄 `البرامج النشطة` - قائمة البرامج\n"
-            "🔗 `anydesk` - تشغيل AnyDesk\n"
-            "📝 `تقرير يومي` - تقرير شامل\n"
-            "🔒 `اقفل الشاشة` - قفل الحاسب\n"
-            "💤 `اغلق الحاسب` - إيقاف التشغيل\n"
-            "🔁 `أعد التشغيل` - إعادة التشغيل\n\n"
-            "يمكنك أيضاً إرسال أوامر بالعربي أو الإنجليزي بشكل طبيعي 🤖"
-        )
-        await update.message.reply_text(help_text, parse_mode="Markdown")
-
-    async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
-        text    = update.message.text
-
-        if is_waiting_pin(user_id):
-            result = verify_pin(user_id, text, self.config)
-            try:
-                await update.message.delete()
-            except Exception:
-                pass
-            if result == "OK":
-                await update.message.reply_text(
-                    "✅ **تم التحقق بنجاح!**\nمرحباً، الجلسة نشطة الآن.",
-                    parse_mode="Markdown"
-                )
-            elif result.startswith("WRONG:"):
-                remaining = result.split(":")[1]
-                await update.message.reply_text(
-                    f"❌ رمز خاطئ. المحاولات المتبقية: {remaining}"
-                )
-            elif result == "BLOCKED":
-                await update.message.reply_text("🚫 تم حجبك بسبب محاولات متكررة.")
-            elif result == "EXPIRED":
-                await update.message.reply_text("⏰ انتهت المهلة. أرسل أمراً جديداً لطلب PIN.")
-            return
-
-        if not await self._check_auth_and_session(update):
-            return
+    async def _process_text(
+        self,
+        user_id: int,
+        text: str,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """
+        Process a text command from any source (text message or transcribed voice).
+        Centralised here so handle_text and handle_voice share the same logic.
+        """
+        self.last_activity[user_id] = time.time()
 
         if self.config.get("general", {}).get("do_not_disturb", False):
-            await update.message.reply_text("🌙 وضع عدم الإزعاج مفعّل. سيتم تنفيذ الأمر لاحقاً.")
+            await update.message.reply_text(
+                "🌙 وضع عدم الإزعاج مفعّل. سيتم تنفيذ الأمر لاحقاً."
+            )
             return
 
         await context.bot.send_chat_action(update.effective_chat.id, action="typing")
@@ -196,7 +131,12 @@ class PCCommanderBot:
                 result_text, result_file = execute_command(command, args, self.config)
 
                 if self.config.get("security", {}).get("log_commands", True):
-                    log_command(user_id, update.effective_user.username or "", text, result_text)
+                    log_command(
+                        user_id,
+                        update.effective_user.username or "",
+                        text,
+                        result_text
+                    )
 
                 if result_file and os.path.exists(result_file):
                     with open(result_file, "rb") as f:
@@ -215,37 +155,123 @@ class PCCommanderBot:
                         await update.message.reply_voice(audio)
 
         except Exception as e:
-            logger.error(f"خطأ في معالجة الرسالة: {e}")
+            logger.error(f"Error processing message: {e}")
             await update.message.reply_text(f"❌ حدث خطأ: {e}")
 
-    async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.is_authorized(update.effective_user.id):
-            await self._unauthorized_message(update)
+    # ------------------------------------------------------------------
+    # Command handlers
+    # ------------------------------------------------------------------
+
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._check_auth_and_session(update):
             return
 
+        keyboard = []
+        row = []
+        for i, (label, _) in enumerate(QUICK_COMMANDS_AR):
+            row.append(InlineKeyboardButton(label, callback_data=f"quick_{i}"))
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+
+        markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "🖥️ **NexAgent**\n\n"
+            "مرحباً! أنا هنا للتحكم بحاسبك.\n"
+            "يمكنك إرسال أمر نصي أو صوتي، أو استخدام الأزرار أدناه:\n\n"
+            "💡 **أمثلة:**\n"
+            "• افتح المتصفح\n"
+            "• خذ لقطة شاشة\n"
+            "• أرسلي حالة الحاسب\n"
+            "• اغلق الحاسب بعد 30 دقيقة",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._check_auth_and_session(update):
+            return
+
+        help_text = (
+            "📖 **قائمة الأوامر المتاحة:**\n\n"
+            "🖼️ `لقطة شاشة` - أخذ صورة للشاشة\n"
+            "📊 `حالة الحاسب` - عرض CPU/RAM/قرص\n"
+            "📁 `الملفات` - تصفح الملفات\n"
+            "🔄 `البرامج النشطة` - قائمة البرامج\n"
+            "🔗 `anydesk` - تشغيل AnyDesk\n"
+            "📝 `تقرير يومي` - تقرير شامل\n"
+            "🔒 `اقفل الشاشة` - قفل الحاسب\n"
+            "💤 `اغلق الحاسب` - إيقاف التشغيل\n"
+            "🔁 `أعد التشغيل` - إعادة التشغيل\n\n"
+            "يمكنك أيضاً إرسال أوامر بالعربي أو الإنجليزي بشكل طبيعي 🤖"
+        )
+        await update.message.reply_text(help_text, parse_mode="Markdown")
+
+    async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        text = update.message.text
+
+        # PIN verification flow takes priority
+        if is_waiting_pin(user_id):
+            result = verify_pin(user_id, text, self.config)
+            try:
+                await update.message.delete()
+            except Exception:
+                pass
+            if result == "OK":
+                await update.message.reply_text(
+                    "✅ **تم التحقق بنجاح!**\nمرحباً، الجلسة نشطة الآن.",
+                    parse_mode="Markdown"
+                )
+            elif result.startswith("WRONG:"):
+                remaining = result.split(":")[1]
+                await update.message.reply_text(
+                    f"❌ رمز خاطئ. المحاولات المتبقية: {remaining}"
+                )
+            elif result == "BLOCKED":
+                await update.message.reply_text("🚫 تم حجبك بسبب محاولات متكررة.")
+            elif result == "EXPIRED":
+                await update.message.reply_text(
+                    "⏰ انتهت المهلة. أرسل أمراً جديداً لطلب PIN."
+                )
+            return
+
+        if not await self._check_auth_and_session(update):
+            return
+
+        await self._process_text(user_id, text, update, context)
+
+    async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._check_auth_and_session(update):
+            return
+
+        user_id = update.effective_user.id
         await context.bot.send_chat_action(update.effective_chat.id, action="typing")
         await update.message.reply_text("🎤 جاري تحويل الصوت...")
 
         try:
             voice_file = await context.bot.get_file(update.message.voice.file_id)
             voice_data = await voice_file.download_as_bytearray()
-            text = self.ai_handler.transcribe_audio(bytes(voice_data))
+            transcribed_text = self.ai_handler.transcribe_audio(bytes(voice_data))
 
-            if text.startswith("❌"):
-                await update.message.reply_text(text)
+            if transcribed_text.startswith("❌"):
+                await update.message.reply_text(transcribed_text)
                 return
 
-            await update.message.reply_text(f"🎤 سمعتك: _{text}_", parse_mode="Markdown")
+            await update.message.reply_text(
+                f"🎤 سمعتك: _{transcribed_text}_", parse_mode="Markdown"
+            )
 
-            update.message.text = text
-            await self.handle_text(update, context)
+            # Pass transcribed text directly — never mutate update.message.text (FIX-9)
+            await self._process_text(user_id, transcribed_text, update, context)
 
         except Exception as e:
             await update.message.reply_text(f"❌ فشل تحويل الصوت: {e}")
 
     async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.is_authorized(update.effective_user.id):
-            await self._unauthorized_message(update)
+        if not await self._check_auth_and_session(update):
             return
 
         try:
@@ -267,7 +293,7 @@ class PCCommanderBot:
         query = update.callback_query
         await query.answer()
 
-        if not self.is_authorized(query.from_user.id):
+        if not await self._check_auth_and_session(update):
             return
 
         data = query.data
@@ -280,7 +306,9 @@ class PCCommanderBot:
                     with open(result_file, "rb") as f:
                         await query.message.reply_photo(f, caption=result_text or "")
                 else:
-                    await query.message.reply_text(result_text or "✅ تم", parse_mode="Markdown")
+                    await query.message.reply_text(
+                        result_text or "✅ تم", parse_mode="Markdown"
+                    )
 
         elif data.startswith("wol_manual_"):
             parts = data.split("_", 3)
@@ -291,7 +319,8 @@ class PCCommanderBot:
                 success = send_magic_packet(mac, broadcast)
                 if success:
                     await query.message.reply_text(
-                        "✅ **تم إرسال إشارة التشغيل!**\n⏳ الحاسب يحتاج 30-60 ثانية للإقلاع.",
+                        "✅ **تم إرسال إشارة التشغيل!**\n"
+                        "⏳ الحاسب يحتاج 30-60 ثانية للإقلاع.",
                         parse_mode="Markdown"
                     )
                     wol_cfg = self.config.get("wol", {})
@@ -312,31 +341,45 @@ class PCCommanderBot:
                 notifier = WoLNotifier(bot=self, config=self.config)
                 notifier.notify_async(query.from_user.id)
 
+    # ------------------------------------------------------------------
+    # Notifications
+    # ------------------------------------------------------------------
+
     async def send_notification(self, message: str):
+        """Send a message to all allowed users."""
         if not self.app or not self.allowed_users:
             return
         for uid in self.allowed_users:
             try:
                 await self.app.bot.send_message(uid, message, parse_mode="Markdown")
             except Exception as e:
-                logger.error(f"فشل إرسال الإشعار: {e}")
+                logger.error(f"Failed to send notification: {e}")
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     def start(self):
+        """Start the bot in a background thread."""
         self._running = True
         self._thread = threading.Thread(target=self._run_bot, daemon=True)
         self._thread.start()
 
     def _run_bot(self):
+        """Thread target: create an event loop and run the bot."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self._async_run())
 
     async def _async_run(self):
+        """Build and start the Telegram Application."""
         self.app = Application.builder().token(self.token).build()
 
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("help", self.help_command))
-        self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
+        self.app.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text)
+        )
         self.app.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
         self.app.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
@@ -348,21 +391,69 @@ class PCCommanderBot:
 
         if self.config.get("security", {}).get("watchdog_enabled", True):
             from src.utils.watchdog import start_watchdog
+
             def _get_bot():
                 return self.app.bot if self.app else None
+
             def _get_config():
                 return self.config
+
             def _restart():
-                pass
+                """Restart the bot gracefully after a watchdog-detected failure."""
+                try:
+                    self.stop()
+                    time.sleep(2)
+                    self.start()
+                    logger.info("Watchdog restarted the bot successfully.")
+                except Exception as e:
+                    logger.error(f"Watchdog restart failed: {e}")
+
             start_watchdog(_get_bot, _get_config, _restart)
 
-        logger.info("✅ البوت يعمل...")
+        self._start_context_cleanup()
+
+        logger.info("NexAgent bot is running...")
         await self.app.run_polling(drop_pending_updates=True)
 
     def stop(self):
+        """Stop the bot, handling both running and idle event-loop states."""
         self._running = False
         if self.app:
             try:
-                asyncio.run(self.app.stop())
-            except Exception:
-                pass
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.call_soon_threadsafe(
+                        lambda: loop.create_task(self.app.stop())
+                    )
+                else:
+                    loop.run_until_complete(self.app.stop())
+            except Exception as e:
+                logger.warning(f"Bot stop warning: {e}")
+
+    # ------------------------------------------------------------------
+    # Context TTL cleanup (FIX-13)
+    # ------------------------------------------------------------------
+
+    def _start_context_cleanup(self) -> None:
+        """Start a background thread that removes idle conversation contexts."""
+        def _cleanup_loop():
+            idle_cutoff = 7200  # 2 hours in seconds
+            while self._running:
+                time.sleep(1800)  # run every 30 minutes
+                now = time.time()
+                to_remove = [
+                    uid for uid, last in self.last_activity.items()
+                    if now - last > idle_cutoff
+                ]
+                for uid in to_remove:
+                    self.conversation_context.pop(uid, None)
+                    self.last_activity.pop(uid, None)
+                if to_remove:
+                    logger.info(
+                        f"Context cleanup: removed {len(to_remove)} idle user(s)."
+                    )
+
+        t = threading.Thread(
+            target=_cleanup_loop, daemon=True, name="ContextCleanup"
+        )
+        t.start()

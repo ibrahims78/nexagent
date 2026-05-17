@@ -47,7 +47,8 @@ SYSTEM_PROMPT_AR = """أنت مساعد ذكاء اصطناعي متخصص في 
 
 
 class GeminiHandler:
-    def __init__(self, api_key: str, model: str = "gemini-pro"):
+    def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
+        """Initialize the Gemini handler with the given API key and model."""
         genai.configure(api_key=api_key)
         self.model_name = model
         self.model = genai.GenerativeModel(
@@ -56,6 +57,7 @@ class GeminiHandler:
         )
 
     def process_command(self, user_message: str, context: list = None) -> dict:
+        """Send user message to Gemini and parse the JSON command response."""
         try:
             chat = self.model.start_chat(history=[])
             response = chat.send_message(user_message)
@@ -71,6 +73,7 @@ class GeminiHandler:
             return {"command": "chat", "args": [], "response": f"❌ خطأ في Gemini: {e}"}
 
     def transcribe_audio(self, audio_data: bytes, language: str = "ar") -> str:
+        """Transcribe audio bytes to text using SpeechRecognition (Google)."""
         try:
             import speech_recognition as sr
             r = sr.Recognizer()
@@ -82,6 +85,7 @@ class GeminiHandler:
             return "❌ تحويل الصوت غير متاح مع Gemini، استخدم OpenAI للصوت"
 
     def text_to_speech(self, text: str) -> bytes:
+        """Convert text to Arabic speech and return audio bytes."""
         try:
             from gtts import gTTS
             tts = gTTS(text=text, lang="ar", slow=False)
@@ -93,8 +97,9 @@ class GeminiHandler:
             return None
 
     def verify_key(self) -> bool:
+        """Verify that the configured API key is valid by sending a test prompt."""
         try:
-            model = genai.GenerativeModel("gemini-pro")
+            model = genai.GenerativeModel(self.model_name)
             model.generate_content("test")
             return True
         except Exception:
