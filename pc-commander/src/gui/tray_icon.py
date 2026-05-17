@@ -31,15 +31,15 @@ class TrayIcon:
             import pystray
             image = create_icon_image()
             menu = pystray.Menu(
-                pystray.MenuItem("🖥️ PC Commander", lambda: None, enabled=False),
+                pystray.MenuItem("🖥️ NexAgent", lambda: None, enabled=False),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("فتح الإعدادات", self._on_show),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("إنهاء البرنامج", self._on_quit)
             )
-            self.icon = pystray.Icon("PCCommander", image, "PC Commander", menu)
+            self.icon = pystray.Icon("NexAgent", image, "NexAgent", menu)
             self.icon.run()
-        except Exception as e:
+        except Exception:
             pass
 
     def _on_show(self, icon=None, item=None):

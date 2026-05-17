@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 import threading
-import sys
 import logging
 
 log = logging.getLogger("werkzeug")
@@ -23,12 +22,11 @@ def set_secret_token(token: str):
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "app": "PC Commander"})
+    return jsonify({"status": "ok", "app": "NexAgent"})
 
 
 @app.route("/command", methods=["POST"])
 def execute_command():
-    global _command_handler, _secret_token
     token = request.headers.get("X-Auth-Token", "")
     if _secret_token and token != _secret_token:
         return jsonify({"error": "Unauthorized"}), 401

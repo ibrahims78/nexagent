@@ -1,17 +1,16 @@
 import sys
 import threading
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import messagebox, filedialog
 import customtkinter as ctk
 from src.utils.config import load_config, save_config
 from src.utils.startup import set_startup, is_startup_enabled
-from src.security.auth import validate_telegram_token
+from src.utils.security_auth import validate_telegram_token
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION = "1.0.0"
-APP_NAME = "PC Commander"
+APP_VERSION = "1.1.0"
+APP_NAME = "NexAgent"
 
 
 class SettingsWindow(ctk.CTk):

@@ -183,3 +183,26 @@ def get_security_report(config: dict) -> str:
     if blocked > 0:
         lines.append(f"\nالمحجوبون: {', '.join(str(u) for u in _blocked_users)}")
     return "\n".join(lines)
+
+
+def validate_telegram_token(token: str) -> dict:
+    """Validate a Telegram bot token via the getMe API (stdlib only)."""
+    import urllib.request
+    import urllib.error
+    import json as _json
+    try:
+        url = f"https://api.telegram.org/bot{token}/getMe"
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        if data.get("ok"):
+            bot = data["result"]
+            return {
+                "valid": True,
+                "bot_name": bot.get("first_name", ""),
+                "username": bot.get("username", ""),
+            }
+        return {"valid": False, "error": "استجابة غير صحيحة من Telegram"}
+    except urllib.error.HTTPError as e:
+        return {"valid": False, "error": f"HTTP {e.code}: Token غير صالح"}
+    except Exception as e:
+        return {"valid": False, "error": str(e)}

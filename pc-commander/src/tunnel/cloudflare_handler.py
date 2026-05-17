@@ -50,7 +50,7 @@ class CloudflareHandler:
             url = self._wait_for_url(timeout=30)
             self.public_url = url
             return url
-        except Exception as e:
+        except Exception:
             return None
 
     def _wait_for_url(self, timeout: int = 30) -> str:

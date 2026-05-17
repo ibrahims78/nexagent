@@ -86,6 +86,6 @@ def set_anydesk_password(password: str, anydesk_path: str = None) -> str:
         return "❌ لم يتم العثور على AnyDesk"
     try:
         subprocess.run([path, "--set-password", password], capture_output=True, timeout=5)
-        return f"✅ تم تعيين كلمة مرور AnyDesk"
+        return "✅ تم تعيين كلمة مرور AnyDesk"
     except Exception as e:
         return f"❌ فشل تعيين كلمة المرور: {e}"

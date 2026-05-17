@@ -1,10 +1,3 @@
-import subprocess
-import requests
-import time
-import sys
-import os
-
-
 class NgrokHandler:
     def __init__(self, auth_token: str = None, port: int = 5000):
         self.auth_token = auth_token
@@ -22,7 +15,7 @@ class NgrokHandler:
             tunnel = ngrok.connect(self.port, "http")
             self.public_url = tunnel.public_url.replace("http://", "https://")
             return self.public_url
-        except Exception as e:
+        except Exception:
             return None
 
     def stop(self):

@@ -30,10 +30,9 @@ def append_to_word(path: str, text: str) -> str:
 def create_word_document(path: str, title: str = "", content: str = "") -> str:
     try:
         from docx import Document
-        from docx.shared import Pt
         doc = Document()
         if title:
-            heading = doc.add_heading(title, level=1)
+            doc.add_heading(title, level=1)
         if content:
             doc.add_paragraph(content)
         doc.add_paragraph(f"\nتم الإنشاء: {datetime.now().strftime('%Y-%m-%d %H:%M')}")

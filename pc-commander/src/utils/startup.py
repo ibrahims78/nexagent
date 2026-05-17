@@ -1,12 +1,11 @@
 import sys
-import os
 
 IS_WINDOWS = sys.platform == "win32"
 
 if IS_WINDOWS:
     import winreg
 
-APP_NAME = "PCCommander"
+APP_NAME = "NexAgent"
 STARTUP_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 
@@ -26,7 +25,7 @@ def set_startup(enable: bool, exe_path: str = None):
                 pass
         winreg.CloseKey(key)
         return True
-    except Exception as e:
+    except Exception:
         return False
 
 

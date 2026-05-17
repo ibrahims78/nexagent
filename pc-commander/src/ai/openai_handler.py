@@ -1,4 +1,3 @@
-import os
 import io
 from openai import OpenAI
 
@@ -96,7 +95,7 @@ class OpenAIHandler:
                 input=text
             )
             return response.content
-        except Exception as e:
+        except Exception:
             return None
 
     def verify_key(self) -> bool:

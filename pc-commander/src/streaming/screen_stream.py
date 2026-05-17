@@ -6,8 +6,6 @@ import io
 import time
 import threading
 import hashlib
-import base64
-from pathlib import Path
 
 try:
     from flask import Flask, Response, request, abort, render_template_string
@@ -254,7 +252,6 @@ def stop_stream() -> str:
 
 
 def get_stream_status(config: dict) -> dict:
-    global _stream_server
     port    = int(config.get("stream", {}).get("port", 8765))
     running = bool(_stream_server and _stream_server.is_running)
     return {"running": running, "port": port}

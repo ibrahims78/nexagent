@@ -1,10 +1,7 @@
 import asyncio
-import io
 import os
-import sys
 import threading
 import time
-from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -14,7 +11,7 @@ from src.utils.logger import get_logger, log_command
 from src.bot.commands import execute_command
 from src.utils.security_auth import (
     check_authorization, request_pin_auth, verify_pin,
-    is_waiting_pin, create_session, get_security_report
+    is_waiting_pin
 )
 
 logger = get_logger()

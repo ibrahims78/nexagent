@@ -1,6 +1,5 @@
 import psutil
 import sys
-import os
 from datetime import datetime
 
 IS_WINDOWS = sys.platform == "win32"
@@ -59,7 +58,7 @@ def get_daily_report() -> str:
 
     alerts = check_alerts()
     if alerts:
-        report += f"\n⚠️ **تنبيهات:**\n" + "\n".join(alerts)
+        report += "\n⚠️ **تنبيهات:**\n" + "\n".join(alerts)
 
     return report
 

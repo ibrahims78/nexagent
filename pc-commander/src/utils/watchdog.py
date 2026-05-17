@@ -55,7 +55,7 @@ def _send_telegram_notification(bot, config: dict, text: str):
 
 def _watchdog_loop(get_bot_func, get_config_func, restart_func):
     """Main watchdog loop: monitors internet and bot health."""
-    global _last_known_online, _running
+    global _last_known_online
     offline_since = None
     offline_notified = False
     bot_failure_count = 0

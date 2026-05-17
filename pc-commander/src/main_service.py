@@ -1,8 +1,4 @@
-import sys
-import threading
-from src.utils.config import load_config
 from src.utils.logger import get_logger
-from src.server.http_server import start_server
 
 logger = get_logger()
 

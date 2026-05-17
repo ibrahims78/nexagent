@@ -1,5 +1,4 @@
 import base64
-import io
 import sys
 import json
 from src.utils.logger import get_logger

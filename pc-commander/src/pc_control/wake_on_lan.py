@@ -1,6 +1,4 @@
 import socket
-import struct
-import sys
 import re
 from src.utils.logger import get_logger
 

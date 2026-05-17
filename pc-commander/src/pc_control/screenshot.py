@@ -1,7 +1,6 @@
 import io
 import sys
 from datetime import datetime
-from pathlib import Path
 
 IS_WINDOWS = sys.platform == "win32"
 

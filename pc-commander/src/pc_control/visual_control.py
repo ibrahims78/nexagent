@@ -122,7 +122,7 @@ def get_screen_size() -> tuple:
 
 def take_annotated_screenshot(actions: list) -> bytes:
     from src.pc_control.screenshot import take_screenshot
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
     import io
 
     screenshot_data = take_screenshot()

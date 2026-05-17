@@ -69,9 +69,9 @@ def get_file_info(path: str) -> str:
     try:
         p = Path(path)
         if not p.exists():
-            return f"❌ الملف غير موجود"
+            return "❌ الملف غير موجود"
         stat = p.stat()
-        info = f"📄 **معلومات الملف:**\n"
+        info = "📄 **معلومات الملف:**\n"
         info += f"• الاسم: {p.name}\n"
         info += f"• الحجم: {_human_size(stat.st_size)}\n"
         info += f"• النوع: {'مجلد' if p.is_dir() else p.suffix or 'ملف'}\n"

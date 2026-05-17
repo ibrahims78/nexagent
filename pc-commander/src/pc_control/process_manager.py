@@ -99,6 +99,6 @@ def set_volume(level: int) -> str:
             volume.SetMasterVolumeLevelScalar(level / 100, None)
             return f"✅ تم ضبط الصوت على {level}%"
         except Exception:
-            os.system(f"powershell -c \"(New-Object -com Shell.Application).sendkeys([char]174)\"")
-            return f"✅ تم تعديل الصوت"
+            os.system("powershell -c \"(New-Object -com Shell.Application).sendkeys([char]174)\"")
+            return "✅ تم تعديل الصوت"
     return "❌ هذه الميزة متاحة على ويندوز فقط"

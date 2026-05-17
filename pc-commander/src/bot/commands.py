@@ -1,7 +1,4 @@
 import os
-import sys
-import json
-from pathlib import Path
 
 # Shared VisionHandler instance injected by main_service (FIX-3)
 _vision_handler = None

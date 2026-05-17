@@ -1,13 +1,11 @@
 import logging
-import os
 from datetime import datetime
-from pathlib import Path
 from src.utils.config import get_logs_dir
 
 _logger = None
 
 
-def get_logger(name="PCCommander") -> logging.Logger:
+def get_logger(name="NexAgent") -> logging.Logger:
     global _logger
     if _logger:
         return _logger
