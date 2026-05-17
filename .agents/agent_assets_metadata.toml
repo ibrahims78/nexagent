@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "FP5ZQ4JgxPKBli8fJ_MSn"
+uri = "file://PCCommander_v1.0.0.tar.gz"
+type = "unspecified"
+title = "PC Commander v1.0.0 - المشروع الكامل"
