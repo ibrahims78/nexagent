@@ -6,3 +6,9 @@ id = "FP5ZQ4JgxPKBli8fJ_MSn"
 uri = "file://PCCommander_v1.0.0.tar.gz"
 type = "unspecified"
 title = "PC Commander v1.0.0 - أمان متعدد الطبقات + Watchdog"
+
+[[outputs]]
+id = "Lac2e6r1TL88ajk7qBaQI"
+uri = "file://NexAgent_V1_Source.zip"
+type = "unspecified"
+title = "NexAgent_V1_Source.zip — الملف الكامل للتنصيب"
