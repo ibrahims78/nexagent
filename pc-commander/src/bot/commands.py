@@ -98,6 +98,21 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
             anydesk_id = anydesk.get_anydesk_id(anydesk_path if anydesk_path else None)
             result_text = f"🔑 **رقم AnyDesk:** `{anydesk_id}`"
 
+        elif command == "vision_do":
+            user_cmd = " ".join(args) if args else ""
+            result_text, result_file = _vision_execute(user_cmd, config)
+
+        elif command == "vision_describe":
+            result_text = _vision_describe(config)
+
+        elif command == "vision_find_click":
+            element = " ".join(args) if args else ""
+            result_text = _vision_find_click(element, config)
+
+        elif command == "vision_task":
+            task = " ".join(args) if args else ""
+            result_text, result_file = _vision_task(task, config)
+
         elif command == "chat":
             result_text = args[0] if args else ""
 
@@ -108,3 +123,60 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
         result_text = f"❌ خطأ في تنفيذ الأمر: {e}"
 
     return result_text, result_file
+
+
+def _get_smart_executor(config: dict):
+    provider = config.get("ai", {}).get("provider", "openai")
+    if provider != "openai":
+        raise RuntimeError("❌ التحكم البصري يتطلب OpenAI (GPT-4o)")
+    key = config.get("ai", {}).get("openai_key", "")
+    if not key:
+        raise RuntimeError("❌ مفتاح OpenAI غير موجود")
+    from src.ai.vision_handler import VisionHandler
+    from src.pc_control.smart_executor import SmartExecutor
+    return SmartExecutor(VisionHandler(api_key=key, model="gpt-4o"))
+
+
+def _vision_execute(user_cmd: str, config: dict) -> tuple:
+    import tempfile, os
+    executor = _get_smart_executor(config)
+    result = executor.execute_smart_command(user_cmd)
+
+    actions_summary = "\n".join(result.get("actions_taken", []))
+    text = (
+        f"🧠 **التحكم البصري الذكي**\n\n"
+        f"📺 الشاشة: {result.get('screen_description', '')[:200]}\n\n"
+        f"⚡ الإجراءات المنفذة:\n{actions_summary}\n\n"
+        f"💬 {result.get('response', '')}"
+    )
+    annotated = result.get("annotated_screenshot")
+    filepath = None
+    if annotated:
+        from src.utils.config import get_config_dir
+        screenshots_dir = get_config_dir() / "screenshots"
+        screenshots_dir.mkdir(exist_ok=True)
+        from datetime import datetime
+        filepath = str(screenshots_dir / f"vision_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        with open(filepath, "wb") as f:
+            f.write(annotated)
+    return text, filepath
+
+
+def _vision_describe(config: dict) -> str:
+    executor = _get_smart_executor(config)
+    description = executor.describe_current_screen()
+    return f"👁️ **وصف الشاشة الحالية:**\n\n{description}"
+
+
+def _vision_find_click(element: str, config: dict) -> str:
+    executor = _get_smart_executor(config)
+    return executor.find_and_click(element)
+
+
+def _vision_task(task: str, config: dict) -> tuple:
+    executor = _get_smart_executor(config)
+    steps = executor.multi_step_task(task, max_steps=6)
+    text = f"🔄 **مهمة ذكية متعددة الخطوات:**\n\n" + "\n".join(
+        [f"{i+1}. {s}" for i, s in enumerate(steps)]
+    )
+    return text, None
