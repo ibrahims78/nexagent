@@ -223,6 +223,36 @@ class PCCommanderBot:
                 else:
                     await query.message.reply_text(result_text or "✅ تم", parse_mode="Markdown")
 
+        elif data.startswith("wol_manual_"):
+            parts = data.split("_", 3)
+            mac = parts[2] if len(parts) > 2 else ""
+            broadcast = parts[3] if len(parts) > 3 else "255.255.255.255"
+            if mac:
+                from src.pc_control.wake_on_lan import send_magic_packet
+                success = send_magic_packet(mac, broadcast)
+                if success:
+                    await query.message.reply_text(
+                        "✅ **تم إرسال إشارة التشغيل!**\n⏳ الحاسب يحتاج 30-60 ثانية للإقلاع.",
+                        parse_mode="Markdown"
+                    )
+                    wol_cfg = self.config.get("wol", {})
+                    pc_ip = wol_cfg.get("pc_ip", "")
+                    if pc_ip and wol_cfg.get("monitor_startup", True):
+                        from src.utils.wol_notifier import WoLNotifier
+                        notifier = WoLNotifier(bot=self, config=self.config)
+                        notifier.monitor_pc_startup(pc_ip, self.allowed_users)
+                else:
+                    await query.message.reply_text("❌ فشل الإرسال. تأكد من الواي فاي.")
+
+        elif data == "wol_start":
+            result_text, _ = execute_command("wol_start", [], self.config)
+            await query.message.reply_text(result_text, parse_mode="Markdown")
+            wol_cfg = self.config.get("wol", {})
+            if wol_cfg.get("auto_notify_backup", True) and wol_cfg.get("backup_users"):
+                from src.utils.wol_notifier import WoLNotifier
+                notifier = WoLNotifier(bot=self, config=self.config)
+                notifier.notify_async(query.from_user.id)
+
     async def send_notification(self, message: str):
         if not self.app or not self.allowed_users:
             return

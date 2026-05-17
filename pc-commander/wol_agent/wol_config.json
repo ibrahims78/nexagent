@@ -1,0 +1,8 @@
+{
+  "bot_token": "ضع_هنا_token_البوت_الاحتياطي",
+  "allowed_users": [],
+  "pc_mac": "XX:XX:XX:XX:XX:XX",
+  "pc_broadcast": "192.168.1.255",
+  "pc_ip": "192.168.1.100",
+  "agent_name": "وكيل المنزل"
+}

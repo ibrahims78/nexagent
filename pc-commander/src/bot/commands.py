@@ -98,6 +98,16 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
             anydesk_id = anydesk.get_anydesk_id(anydesk_path if anydesk_path else None)
             result_text = f"🔑 **رقم AnyDesk:** `{anydesk_id}`"
 
+        elif command == "wol_start":
+            from src.pc_control.wake_on_lan import wol_command
+            result_text = wol_command(config)
+
+        elif command == "wol_notify":
+            result_text = "📲 سيتم إرسال إشعار للشخص الاحتياطي في المنزل..."
+
+        elif command == "wol_status":
+            result_text = _wol_check_status(config)
+
         elif command == "vision_do":
             user_cmd = " ".join(args) if args else ""
             result_text, result_file = _vision_execute(user_cmd, config)
@@ -123,6 +133,23 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
         result_text = f"❌ خطأ في تنفيذ الأمر: {e}"
 
     return result_text, result_file
+
+
+def _wol_check_status(config: dict) -> str:
+    import socket
+    pc_ip = config.get("wol", {}).get("pc_ip", "")
+    if not pc_ip:
+        return "❌ لم يتم ضبط IP الحاسب في إعدادات WoL"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(3)
+        result = s.connect_ex((pc_ip, 445))
+        s.close()
+        if result == 0:
+            return f"✅ **الحاسب يعمل الآن**\n🌐 IP: `{pc_ip}`"
+        return f"❌ **الحاسب مطفأ أو غير متاح**\n🌐 IP: `{pc_ip}`"
+    except Exception as e:
+        return f"❌ فشل الفحص: {e}"
 
 
 def _get_smart_executor(config: dict):

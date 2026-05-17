@@ -42,6 +42,14 @@ DEFAULT_CONFIG = {
         "path": "C:\\Program Files (x86)\\AnyDesk\\AnyDesk.exe",
         "auto_accept": False
     },
+    "wol": {
+        "mac_address": "",
+        "broadcast_ip": "255.255.255.255",
+        "pc_ip": "",
+        "backup_users": [],
+        "auto_notify_backup": True,
+        "monitor_startup": True
+    },
     "security": {
         "log_commands": True,
         "notify_on_unauthorized": True

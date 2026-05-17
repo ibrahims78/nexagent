@@ -60,12 +60,13 @@ class SettingsWindow(ctk.CTk):
         self.tabview = ctk.CTkTabview(self, corner_radius=10)
         self.tabview.grid(row=1, column=0, padx=15, pady=10, sticky="nsew")
 
-        for tab in ["تيليغرام", "الذكاء الاصطناعي", "الاتصال", "الإعدادات", "المراقبة", "السجلات"]:
+        for tab in ["تيليغرام", "الذكاء الاصطناعي", "الاتصال", "إيقاظ الحاسب", "الإعدادات", "المراقبة", "السجلات"]:
             self.tabview.add(tab)
 
         self._build_telegram_tab()
         self._build_ai_tab()
         self._build_tunnel_tab()
+        self._build_wol_tab()
         self._build_settings_tab()
         self._build_monitoring_tab()
         self._build_logs_tab()
@@ -297,6 +298,94 @@ class SettingsWindow(ctk.CTk):
         ctk.CTkEntry(time_frame, textvariable=self.report_time_var, width=100,
                      placeholder_text="HH:MM").pack(side="left", padx=10)
 
+    def _build_wol_tab(self):
+        tab = self.tabview.tab("إيقاظ الحاسب")
+        tab.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(tab, text="إيقاظ الحاسب عن بُعد (Wake-on-LAN)",
+                     font=ctk.CTkFont(size=15, weight="bold")).pack(pady=(15, 5))
+
+        ctk.CTkLabel(
+            tab,
+            text="يتيح تشغيل حاسبك حتى وهو مطفأ عبر تيليغرام",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).pack(pady=(0, 10))
+
+        frame = ctk.CTkFrame(tab)
+        frame.pack(fill="x", padx=20, pady=5)
+        frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(frame, text="MAC Address الحاسب:", width=170, anchor="w").grid(row=0, column=0, padx=10, pady=8)
+        self.wol_mac_var = ctk.StringVar()
+        ctk.CTkEntry(frame, textvariable=self.wol_mac_var,
+                     placeholder_text="A1:B2:C3:D4:E5:F6").grid(row=0, column=1, padx=10, pady=8, sticky="ew")
+        ctk.CTkButton(frame, text="اكتشف", width=80,
+                      fg_color="#1565c0", hover_color="#0d47a1",
+                      command=self._detect_mac).grid(row=0, column=2, padx=10, pady=8)
+
+        ctk.CTkLabel(frame, text="IP الحاسب:", width=170, anchor="w").grid(row=1, column=0, padx=10, pady=8)
+        self.wol_ip_var = ctk.StringVar()
+        ctk.CTkEntry(frame, textvariable=self.wol_ip_var,
+                     placeholder_text="192.168.1.100").grid(row=1, column=1, padx=10, pady=8, sticky="ew")
+
+        ctk.CTkLabel(frame, text="Broadcast IP:", width=170, anchor="w").grid(row=2, column=0, padx=10, pady=8)
+        self.wol_broadcast_var = ctk.StringVar(value="255.255.255.255")
+        ctk.CTkEntry(frame, textvariable=self.wol_broadcast_var,
+                     placeholder_text="192.168.1.255").grid(row=2, column=1, padx=10, pady=8, sticky="ew")
+
+        backup_frame = ctk.CTkFrame(tab)
+        backup_frame.pack(fill="x", padx=20, pady=10)
+        backup_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(backup_frame, text="📱 المستخدمون الاحتياطيون",
+                     font=ctk.CTkFont(size=13, weight="bold")).grid(row=0, column=0, columnspan=3, padx=10, pady=8)
+
+        ctk.CTkLabel(backup_frame, text="User IDs الاحتياطيين:", width=170, anchor="w").grid(row=1, column=0, padx=10, pady=8)
+        self.wol_backup_users_var = ctk.StringVar()
+        ctk.CTkEntry(backup_frame, textvariable=self.wol_backup_users_var,
+                     placeholder_text="123456789, 987654321").grid(row=1, column=1, padx=10, pady=8, sticky="ew")
+
+        self.wol_auto_notify_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            backup_frame,
+            text="إرسال إشعار تلقائي للاحتياطي عند فشل الإيقاظ",
+            variable=self.wol_auto_notify_var,
+            font=ctk.CTkFont(size=12)
+        ).grid(row=2, column=0, columnspan=3, padx=15, pady=5, sticky="w")
+
+        self.wol_monitor_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            backup_frame,
+            text="إشعار تلقائي عندما يكون الحاسب جاهزاً",
+            variable=self.wol_monitor_var,
+            font=ctk.CTkFont(size=12)
+        ).grid(row=3, column=0, columnspan=3, padx=15, pady=5, sticky="w")
+
+        test_frame = ctk.CTkFrame(tab)
+        test_frame.pack(fill="x", padx=20, pady=5)
+
+        ctk.CTkButton(
+            test_frame, text="🔍 فحص حالة الحاسب", width=180,
+            fg_color="#1565c0", hover_color="#0d47a1",
+            command=self._test_wol_status
+        ).pack(side="left", padx=10, pady=10)
+
+        ctk.CTkButton(
+            test_frame, text="📡 اختبار إرسال إشارة الإيقاظ", width=220,
+            fg_color="#2e7d32", hover_color="#1b5e20",
+            command=self._test_wol_send
+        ).pack(side="left", padx=5, pady=10)
+
+        self.wol_status_label = ctk.CTkLabel(tab, text="", text_color="#aaa",
+                                              font=ctk.CTkFont(size=12))
+        self.wol_status_label.pack(pady=5)
+
+        ctk.CTkLabel(
+            tab,
+            text="💡 راجع ملف SETUP_ANDROID_AR.txt لإعداد الهاتف الاحتياطي",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).pack(pady=5)
+
     def _build_monitoring_tab(self):
         tab = self.tabview.tab("المراقبة")
         tab.grid_columnconfigure(0, weight=1)
@@ -356,6 +445,13 @@ class SettingsWindow(ctk.CTk):
         self.tunnel_provider_var.set(cfg["tunnel"].get("provider", "cloudflare"))
         self.ngrok_token_var.set(cfg["tunnel"].get("ngrok_token", ""))
         self.anydesk_path_var.set(cfg["anydesk"].get("path", ""))
+        wol = cfg.get("wol", {})
+        self.wol_mac_var.set(wol.get("mac_address", ""))
+        self.wol_ip_var.set(wol.get("pc_ip", ""))
+        self.wol_broadcast_var.set(wol.get("broadcast_ip", "255.255.255.255"))
+        self.wol_backup_users_var.set(", ".join(str(u) for u in wol.get("backup_users", [])))
+        self.wol_auto_notify_var.set(wol.get("auto_notify_backup", True))
+        self.wol_monitor_var.set(wol.get("monitor_startup", True))
         self.startup_var.set(is_startup_enabled())
         self.dnd_var.set(cfg["general"].get("do_not_disturb", False))
         self.log_commands_var.set(cfg["security"].get("log_commands", True))
@@ -384,6 +480,14 @@ class SettingsWindow(ctk.CTk):
         self.config["tunnel"]["provider"] = self.tunnel_provider_var.get()
         self.config["tunnel"]["ngrok_token"] = self.ngrok_token_var.get().strip()
         self.config["anydesk"]["path"] = self.anydesk_path_var.get().strip()
+        wol_backup_raw = self.wol_backup_users_var.get().strip()
+        wol_backup = [u.strip() for u in wol_backup_raw.split(",") if u.strip().isdigit()]
+        self.config["wol"]["mac_address"] = self.wol_mac_var.get().strip()
+        self.config["wol"]["pc_ip"] = self.wol_ip_var.get().strip()
+        self.config["wol"]["broadcast_ip"] = self.wol_broadcast_var.get().strip()
+        self.config["wol"]["backup_users"] = wol_backup
+        self.config["wol"]["auto_notify_backup"] = self.wol_auto_notify_var.get()
+        self.config["wol"]["monitor_startup"] = self.wol_monitor_var.get()
         self.config["general"]["do_not_disturb"] = self.dnd_var.get()
         self.config["general"]["daily_report_enabled"] = self.daily_report_var.get()
         self.config["general"]["daily_report_time"] = self.report_time_var.get().strip()
@@ -521,6 +625,68 @@ class SettingsWindow(ctk.CTk):
         import os
         if sys.platform == "win32":
             os.startfile(str(get_logs_dir()))
+
+    def _detect_mac(self):
+        try:
+            from src.pc_control.wake_on_lan import get_pc_mac_windows
+            mac = get_pc_mac_windows()
+            if mac:
+                self.wol_mac_var.set(mac)
+                self.wol_status_label.configure(text=f"✅ تم اكتشاف MAC: {mac}", text_color="#66bb6a")
+            else:
+                self.wol_status_label.configure(text="❌ تعذر الاكتشاف التلقائي", text_color="#ef5350")
+        except Exception as e:
+            self.wol_status_label.configure(text=f"❌ {e}", text_color="#ef5350")
+
+    def _test_wol_status(self):
+        ip = self.wol_ip_var.get().strip()
+        if not ip:
+            self.wol_status_label.configure(text="⚠️ أدخل IP الحاسب أولاً", text_color="#ffb300")
+            return
+        self.wol_status_label.configure(text="🔍 جاري الفحص...", text_color="#aaa")
+        self.update()
+
+        def check():
+            import socket
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(3)
+                result = s.connect_ex((ip, 445))
+                s.close()
+                if result == 0:
+                    self.wol_status_label.configure(text=f"✅ الحاسب يعمل على {ip}", text_color="#66bb6a")
+                else:
+                    self.wol_status_label.configure(text=f"❌ الحاسب مطفأ أو غير متاح ({ip})", text_color="#ef5350")
+            except Exception as e:
+                self.wol_status_label.configure(text=f"❌ {e}", text_color="#ef5350")
+
+        threading.Thread(target=check, daemon=True).start()
+
+    def _test_wol_send(self):
+        mac = self.wol_mac_var.get().strip()
+        broadcast = self.wol_broadcast_var.get().strip() or "255.255.255.255"
+        if not mac:
+            self.wol_status_label.configure(text="⚠️ أدخل MAC Address أولاً", text_color="#ffb300")
+            return
+
+        def send():
+            try:
+                from src.pc_control.wake_on_lan import send_magic_packet, validate_mac
+                if not validate_mac(mac):
+                    self.wol_status_label.configure(text="❌ MAC Address غير صالح", text_color="#ef5350")
+                    return
+                self.wol_status_label.configure(text="📡 جاري الإرسال...", text_color="#aaa")
+                success = send_magic_packet(mac, broadcast)
+                if success:
+                    self.wol_status_label.configure(
+                        text="✅ تم إرسال Magic Packet بنجاح!", text_color="#66bb6a"
+                    )
+                else:
+                    self.wol_status_label.configure(text="❌ فشل الإرسال", text_color="#ef5350")
+            except Exception as e:
+                self.wol_status_label.configure(text=f"❌ {e}", text_color="#ef5350")
+
+        threading.Thread(target=send, daemon=True).start()
 
     def _minimize_to_tray(self):
         self.withdraw()
