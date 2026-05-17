@@ -93,13 +93,13 @@ def is_blocked(user_id: int) -> bool:
 def block_user(user_id: int):
     _blocked_users.add(user_id)
     _save_state()
-    logger.warning(f"🚫 تم حجب المستخدم: {user_id}")
+    logger.warning(f"User blocked: {user_id}")
 
 
 def unblock_user(user_id: int):
     _blocked_users.discard(user_id)
     _save_state()
-    logger.info(f"✅ تم رفع الحجب عن: {user_id}")
+    logger.info(f"User unblocked: {user_id}")
 
 
 def is_session_valid(user_id: int, config: dict) -> bool:
@@ -174,13 +174,13 @@ def verify_pin(user_id: int, entered_pin: str, config: dict) -> str:
             if pending["attempts"] >= MAX_PIN_ATTEMPTS:
                 del _pending_pin[user_id]
                 block_user(user_id)
-                logger.warning(f"🚫 حُجب {user_id} بعد {MAX_PIN_ATTEMPTS} محاولات خاطئة")
+                logger.warning(f"User {user_id} blocked after {MAX_PIN_ATTEMPTS} failed PIN attempts")
                 return "BLOCKED"
             return f"WRONG:{MAX_PIN_ATTEMPTS - pending['attempts']}"
         del _pending_pin[user_id]
 
     create_session(user_id)
-    logger.info(f"✅ جلسة جديدة للمستخدم {user_id}")
+    logger.info(f"New session created for user {user_id}")
     return "OK"
 
 
@@ -204,14 +204,14 @@ def check_authorization(user_id: int, config: dict) -> tuple[bool, str]:
     4. هل لديه جلسة نشطة (إذا كان PIN مفعّلاً)؟
     """
     if not is_allowed_user(user_id, config):
-        logger.warning(f"⛔ محاولة وصول غير مصرّح به: {user_id}")
+        logger.warning(f"Unauthorized access attempt: {user_id}")
         return False, "NOT_ALLOWED"
 
     if is_blocked(user_id):
         return False, "BLOCKED"
 
     if is_rate_limited(user_id):
-        logger.warning(f"⚠️ تجاوز المستخدم {user_id} حد الطلبات")
+        logger.warning(f"Rate limit exceeded for user {user_id}")
         return False, "RATE_LIMITED"
 
     if not is_session_valid(user_id, config):

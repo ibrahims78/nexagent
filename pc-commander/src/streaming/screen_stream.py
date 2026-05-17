@@ -136,7 +136,7 @@ def _generate_stream(fps: int, quality: int, scale: float):
                 b"\r\n"
             )
         except Exception as e:
-            logger.warning(f"خطأ في التقاط الإطار: {e}")
+            logger.warning(f"Frame capture error: {e}")
         time.sleep(delay)
 
 
@@ -249,14 +249,14 @@ class ScreenStreamServer:
         self._running = True
         self._thread  = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
-        logger.info(f"✅ Screen stream بدأ على المنفذ {self.port} (127.0.0.1 only)")
+        logger.info(f"Screen stream started on port {self.port} (127.0.0.1 only)")
         return True
 
     def stop(self):
         if self._running and self._server:
             self._server.shutdown()
         self._running = False
-        logger.info("⏹ Screen stream توقف")
+        logger.info("Screen stream stopped")
 
     @property
     def is_running(self) -> bool:

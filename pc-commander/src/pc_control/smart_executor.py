@@ -16,7 +16,7 @@ class SmartExecutor:
         from src.pc_control.screenshot import take_screenshot
         from src.pc_control.visual_control import execute_visual_actions, take_annotated_screenshot
 
-        logger.info(f"🧠 تنفيذ أمر ذكي: {user_command}")
+        logger.info(f"Smart command executing: {user_command}")
 
         screenshot_data = take_screenshot()
 
@@ -89,7 +89,7 @@ class SmartExecutor:
     def multi_step_task(self, task_description: str, max_steps: int = 5) -> list:
         from src.pc_control.screenshot import take_screenshot
 
-        logger.info(f"🔄 مهمة متعددة الخطوات: {task_description}")
+        logger.info(f"Multi-step task starting: {task_description}")
         results = []
 
         for step in range(max_steps):

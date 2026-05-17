@@ -19,10 +19,10 @@ def send_magic_packet(mac_address: str, broadcast_ip: str = "255.255.255.255", p
             sock.settimeout(3)
             sock.sendto(magic_packet, (broadcast_ip, port))
             sock.sendto(magic_packet, (broadcast_ip, 7))
-        logger.info(f"✅ تم إرسال Magic Packet إلى {mac_address}")
+        logger.info(f"Magic Packet sent to {mac_address}")
         return True
     except Exception as e:
-        logger.error(f"❌ فشل إرسال Magic Packet: {e}")
+        logger.error(f"Magic Packet failed for {mac_address}: {e}")
         return False
 
 

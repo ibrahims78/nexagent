@@ -57,7 +57,7 @@ def _execute_single_action(action: dict) -> str:
             return f"⚠️ نوع إجراء غير معروف: {action_type}"
 
     except Exception as e:
-        logger.error(f"خطأ في الإجراء {action_type}: {e}")
+        logger.error(f"Action error [{action_type}]: {e}")
         return f"❌ فشل {desc}: {e}"
 
 

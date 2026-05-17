@@ -19,7 +19,7 @@ class NetworkMonitor:
         self._running = True
         self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._thread.start()
-        logger.info("✅ مراقب الشبكة يعمل")
+        logger.info("Network monitor started")
 
     def stop(self):
         self._running = False
@@ -28,10 +28,10 @@ class NetworkMonitor:
         while self._running:
             connected = self._check_connection()
             if not connected and self._was_connected:
-                logger.warning("⚠️ انقطع الإنترنت")
+                logger.warning("Internet connection lost")
                 self._was_connected = False
             elif connected and not self._was_connected:
-                logger.info("✅ عاد الإنترنت")
+                logger.info("Internet connection restored")
                 self._was_connected = True
                 if self.bot:
                     try:

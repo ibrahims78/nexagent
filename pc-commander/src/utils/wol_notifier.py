@@ -50,9 +50,9 @@ class WoLNotifier:
                     parse_mode="Markdown"
                 )
                 sent = True
-                logger.info(f"✅ تم إرسال إشعار WoL للمستخدم {uid}")
+                logger.info(f"WoL notification sent to user {uid}")
             except Exception as e:
-                logger.error(f"❌ فشل إرسال إشعار لـ {uid}: {e}")
+                logger.error(f"WoL notification failed for user {uid}: {e}")
 
         return sent
 

@@ -22,7 +22,7 @@ class TaskScheduler:
         self._setup_default_jobs()
         self._restore_saved_tasks()
         self.scheduler.start()
-        logger.info("✅ المجدول يعمل")
+        logger.info("Scheduler started")
 
     def stop(self):
         if self.scheduler.running:
@@ -57,7 +57,7 @@ class TaskScheduler:
                 except RuntimeError:
                     pass
         except Exception as e:
-            logger.error(f"خطأ في التقرير اليومي: {e}")
+            logger.error(f"Daily report error: {e}")
 
     def _check_alerts(self):
         from src.pc_control.system_monitor import check_alerts
@@ -70,7 +70,7 @@ class TaskScheduler:
                 except RuntimeError:
                     pass
         except Exception as e:
-            logger.error(f"خطأ في فحص التنبيهات: {e}")
+            logger.error(f"Alert check error: {e}")
 
     def add_task(self, name: str, command: str, cron_expr: str) -> str:
         try:
@@ -116,7 +116,7 @@ class TaskScheduler:
                 except RuntimeError:
                     pass
         except Exception as e:
-            logger.error(f"خطأ في تنفيذ المهمة المجدولة: {e}")
+            logger.error(f"Scheduled task execution error: {e}")
 
     def _load_tasks(self) -> dict:
         try:

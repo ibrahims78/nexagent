@@ -71,7 +71,7 @@ def validate_command(command: str, args: list) -> tuple[bool, str]:
     spec = COMMAND_REGISTRY.get(command)
     if spec is None:
         logger.warning(f"[WHITELIST] Rejected unknown command: '{command}'")
-        return False, f"أمر غير مسموح به: '{command}'"
+        return False, f"Unknown command: '{command}'"
 
     n = len(args)
     min_a = spec.get("min_args", 0)
@@ -81,13 +81,13 @@ def validate_command(command: str, args: list) -> tuple[bool, str]:
         logger.warning(
             f"[WHITELIST] Command '{command}' needs at least {min_a} arg(s), got {n}"
         )
-        return False, f"الأمر '{command}' يحتاج على الأقل {min_a} معطيات"
+        return False, f"Command '{command}' requires at least {min_a} argument(s)"
 
     if n > max_a:
         logger.warning(
             f"[WHITELIST] Command '{command}' accepts at most {max_a} arg(s), got {n}"
         )
-        return False, f"الأمر '{command}' يقبل على الأكثر {max_a} معطيات"
+        return False, f"Command '{command}' accepts at most {max_a} argument(s)"
 
     arg_types = spec.get("arg_types")
     if arg_types:
@@ -99,6 +99,6 @@ def validate_command(command: str, args: list) -> tuple[bool, str]:
                     logger.warning(
                         f"[WHITELIST] Command '{command}' arg[{i}] expected int, got {arg!r}"
                     )
-                    return False, f"المعطى رقم {i + 1} للأمر '{command}' يجب أن يكون رقماً"
+                    return False, f"Argument {i + 1} for command '{command}' must be a number"
 
     return True, "OK"

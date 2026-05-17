@@ -24,7 +24,7 @@ def download_autologon() -> bool:
                 return False
         return AUTOLOGON_PATH.exists()
     except Exception as e:
-        logger.error(f"فشل تحميل Autologon: {e}")
+        logger.error(f"Failed to download Autologon: {e}")
         return False
 
 
@@ -46,7 +46,7 @@ def setup_autologon(username: str, password: str, domain: str = "") -> str:
             capture_output=True, text=True, timeout=15
         )
         if result.returncode == 0:
-            logger.info("✅ تم ضبط Autologon")
+            logger.info("Autologon configured successfully")
             return "✅ تم ضبط تسجيل الدخول التلقائي بنجاح!\nسيدخل الحاسب تلقائياً عند الإقلاع."
         return f"❌ فشل الضبط: {result.stderr or result.stdout}"
     except Exception as e:

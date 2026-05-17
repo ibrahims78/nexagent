@@ -84,7 +84,7 @@ class VisionHandler:
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
-            logger.error(f"خطأ في التحليل البصري: {e}")
+            logger.error(f"Vision analysis error: {e}")
             return {"response": f"❌ خطأ في التحليل البصري: {e}", "actions": []}
 
     def describe_screen(self, screenshot_bytes: bytes) -> str:
