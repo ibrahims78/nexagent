@@ -57,20 +57,26 @@ class GeminiHandler:
         )
 
     def process_command(self, user_message: str, context: list = None) -> dict:
-        """Send user message to Gemini and parse the JSON command response."""
+        """Send user message to Gemini with conversation history and parse JSON response."""
         try:
-            chat = self.model.start_chat(history=[])
+            history = []
+            if context:
+                for msg in context[-6:]:
+                    role = "user" if msg.get("role") == "user" else "model"
+                    history.append({"role": role, "parts": [msg.get("content", "")]})
+
+            chat = self.model.start_chat(history=history)
             response = chat.send_message(user_message)
             text = response.text.strip()
             if text.startswith("```"):
                 text = text.split("```")[1]
                 if text.startswith("json"):
-                    text = text[4:]
+                    text = text[4:].strip()
             return json.loads(text)
         except json.JSONDecodeError:
             return {"command": "chat", "args": [], "response": response.text}
         except Exception as e:
-            return {"command": "chat", "args": [], "response": f"❌ خطأ في Gemini: {e}"}
+            return {"command": "chat", "args": [], "response": f"❌ Gemini error: {e}"}
 
     def transcribe_audio(self, audio_data: bytes, language: str = "ar") -> str:
         """Transcribe audio bytes to text using SpeechRecognition (Google)."""

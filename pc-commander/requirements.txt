@@ -11,18 +11,17 @@ APScheduler>=3.10.4
 pystray>=0.19.5
 pyngrok>=7.1.0
 gTTS>=2.5.1
-pygame>=2.5.2
 requests>=2.31.0
 cryptography>=42.0.0
 pywin32>=306; sys_platform == "win32"
 paramiko>=3.4.0
 plyer>=2.1.0
 pyperclip>=1.8.2
-keyboard>=0.13.5
-mouse>=0.7.1
 pycaw>=20181226; sys_platform == "win32"
 comtypes>=1.4.1; sys_platform == "win32"
 werkzeug>=3.0.3
 SpeechRecognition>=3.10.0
+# pyaudio requires Microsoft C++ Build Tools on Windows.
+# If pip install fails, run: pip install pipwin && pipwin install pyaudio
 pyaudio>=0.2.13; sys_platform == "win32"
 pyinstaller>=6.5.0; extra == "build"

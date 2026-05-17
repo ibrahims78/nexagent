@@ -9,7 +9,7 @@ from src.utils.security_auth import validate_telegram_token
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 APP_NAME = "NexAgent"
 
 

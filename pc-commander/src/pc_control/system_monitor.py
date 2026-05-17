@@ -1,14 +1,16 @@
+import os as _os
 import psutil
 import sys
 from datetime import datetime
 
 IS_WINDOWS = sys.platform == "win32"
+_SYSTEM_DRIVE = (_os.getenv("SystemDrive", "C:") + "\\") if IS_WINDOWS else "/"
 
 
 def get_system_status() -> str:
     cpu = psutil.cpu_percent(interval=1)
     ram = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    disk = psutil.disk_usage(_SYSTEM_DRIVE)
     battery = psutil.sensors_battery() if hasattr(psutil, "sensors_battery") else None
 
     status = "📊 **حالة الحاسب:**\n\n"
@@ -46,7 +48,7 @@ def get_system_status() -> str:
 def get_daily_report() -> str:
     cpu = psutil.cpu_percent(interval=2)
     ram = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    disk = psutil.disk_usage(_SYSTEM_DRIVE)
     net = psutil.net_io_counters()
 
     report = f"📅 **التقرير اليومي - {datetime.now().strftime('%Y-%m-%d')}**\n\n"
@@ -76,7 +78,7 @@ def check_alerts(config: dict = None) -> list:
 
     cpu = psutil.cpu_percent(interval=1)
     ram = psutil.virtual_memory().percent
-    disk = psutil.disk_usage("/").percent
+    disk = psutil.disk_usage(_SYSTEM_DRIVE).percent
 
     if cpu > cpu_thresh:
         alerts.append(f"🔴 المعالج مرتفع: {cpu:.1f}%")

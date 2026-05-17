@@ -8,8 +8,6 @@ from src.utils.logger import get_logger
 
 logger = get_logger()
 
-TASKS_FILE = get_config_dir() / "scheduled_tasks.json"
-
 
 class TaskScheduler:
     def __init__(self, bot=None, config: dict = None):
@@ -17,6 +15,7 @@ class TaskScheduler:
         tz = self.config.get("general", {}).get("timezone", "Asia/Riyadh")
         self.scheduler = BackgroundScheduler(timezone=tz)
         self.bot = bot
+        self._tasks_file = get_config_dir() / "scheduled_tasks.json"
         self.tasks = self._load_tasks()
 
     def start(self):
@@ -121,8 +120,8 @@ class TaskScheduler:
 
     def _load_tasks(self) -> dict:
         try:
-            if TASKS_FILE.exists():
-                with open(TASKS_FILE, "r", encoding="utf-8") as f:
+            if self._tasks_file.exists():
+                with open(self._tasks_file, "r", encoding="utf-8") as f:
                     return json.load(f)
         except Exception:
             pass
@@ -130,7 +129,7 @@ class TaskScheduler:
 
     def _save_tasks(self):
         try:
-            with open(TASKS_FILE, "w", encoding="utf-8") as f:
+            with open(self._tasks_file, "w", encoding="utf-8") as f:
                 json.dump(self.tasks, f, ensure_ascii=False, indent=2)
         except Exception:
             pass

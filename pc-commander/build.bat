@@ -111,7 +111,6 @@ xcopy /y /q /s "dist\NexAgent\*" "%RELEASE_DIR%\" >nul 2>&1
 for %%F in (
     core\sshremote_tunnel_v2.ps1
     core\sshremote_config.ini
-    core\sshremote_key.pub
     core\setup_v2.bat
     core\start_tunnel_v2.bat
     core\stop_tunnel_v2.bat
@@ -121,6 +120,11 @@ for %%F in (
     core\README_EN.txt
 ) do (
     if exist "%%F" xcopy /y /q "%%F" "%RELEASE_DIR%\core\" >nul 2>&1
+)
+
+if exist "core\sshremote_key.pub" xcopy /q "core\sshremote_key.pub" "%RELEASE_DIR%\core\" >nul 2>&1
+if not exist "%RELEASE_DIR%\core\sshremote_key.pub" (
+    echo NOTE: Generate your SSH key pair: ssh-keygen -t ed25519 -f core\sshremote_key > "%RELEASE_DIR%\core\GENERATE_SSH_KEY.txt"
 )
 
 :: bore.exe note (Windows binary — add manually)

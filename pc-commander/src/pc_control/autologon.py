@@ -16,6 +16,12 @@ def download_autologon() -> bool:
     try:
         AUTOLOGON_PATH.parent.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve(AUTOLOGON_URL, str(AUTOLOGON_PATH))
+        if AUTOLOGON_PATH.exists():
+            file_size = AUTOLOGON_PATH.stat().st_size
+            if file_size < 100_000 or file_size > 2_000_000:
+                logger.error(f"Autologon.exe size unexpected: {file_size} bytes — possible download error")
+                AUTOLOGON_PATH.unlink(missing_ok=True)
+                return False
         return AUTOLOGON_PATH.exists()
     except Exception as e:
         logger.error(f"فشل تحميل Autologon: {e}")

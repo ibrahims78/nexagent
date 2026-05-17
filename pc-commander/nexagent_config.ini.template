@@ -1,0 +1,43 @@
+; NexAgent — Unified Configuration
+; Fill in all values before running.
+
+[telegram]
+bot_token   = YOUR_BOT_TOKEN_HERE
+allowed_users = YOUR_CHAT_ID_HERE
+
+[ai]
+provider     = openai
+openai_key   = YOUR_OPENAI_KEY_HERE
+gemini_key   = YOUR_GEMINI_KEY_HERE
+model_openai = gpt-4o
+model_gemini = gemini-1.5-flash
+
+[security]
+require_pin = false
+session_pin =
+watchdog_enabled = true
+log_commands = true
+
+[general]
+language = ar
+timezone = Asia/Riyadh
+start_with_windows = false
+do_not_disturb = false
+daily_report_time = 08:00
+daily_report_enabled = true
+
+[ssh]
+username =
+key_path =
+password =
+host = 127.0.0.1
+port = 22
+bore_port_file = C:\SshRemote_V2\bore_port.txt
+
+[bore]
+bore_server = bore.pub
+local_port = 22
+
+[install]
+install_path = C:\SshRemote_V2
+task_name = SshRemoteTunnel_V2
