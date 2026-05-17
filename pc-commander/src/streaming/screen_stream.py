@@ -171,6 +171,16 @@ def create_stream_app(password_hash: str, fps: int, quality: int, scale: float) 
 
     _cleanup_sessions()
 
+    def _periodic_cleanup():
+        while True:
+            time.sleep(3600)
+            _cleanup_sessions()
+
+    _cleanup_thread = threading.Thread(
+        target=_periodic_cleanup, daemon=True, name="StreamSessionCleanup"
+    )
+    _cleanup_thread.start()
+
     @app.route("/", methods=["GET", "POST"])
     def index():
         if is_authenticated():
