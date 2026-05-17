@@ -572,12 +572,132 @@ class SettingsWindow(ctk.CTk):
         except Exception as e:
             self.pre_login_status_label.configure(text=f"❌ {e}", text_color="#ef5350")
 
+    def _toggle_stream(self):
+        from src.streaming.screen_stream import start_stream, stop_stream, get_stream_status
+        cfg = {
+            "stream": {
+                "port":    int(self.stream_port_var.get() or 8765),
+                "password": self.stream_pass_var.get() or "pccommander",
+                "fps":     int(self.stream_fps_var.get()),
+                "quality": int(self.stream_quality_var.get()),
+                "scale":   float(self.stream_scale_var.get()),
+            }
+        }
+        status = get_stream_status(cfg)
+        def run():
+            if status["running"]:
+                result = stop_stream()
+                self.stream_toggle_btn.configure(
+                    text="▶ تشغيل البث", fg_color="#2e7d32", hover_color="#1b5e20"
+                )
+                self.stream_status_label.configure(text="⏸️ البث متوقف", text_color="#aaa")
+            else:
+                result = start_stream(cfg)
+                if "✅" in result:
+                    self.stream_toggle_btn.configure(
+                        text="⏹ إيقاف البث", fg_color="#c62828", hover_color="#b71c1c"
+                    )
+                    port = cfg["stream"]["port"]
+                    self.stream_status_label.configure(
+                        text=f"🟢 البث يعمل على المنفذ {port}", text_color="#66bb6a"
+                    )
+                else:
+                    self.stream_status_label.configure(text=result[:70], text_color="#ef5350")
+        threading.Thread(target=run, daemon=True).start()
+
+    def _copy_stream_url(self):
+        try:
+            import socket
+            port = int(self.stream_port_var.get() or 8765)
+            ip = socket.gethostbyname(socket.gethostname())
+            url = f"http://{ip}:{port}"
+            self.clipboard_clear()
+            self.clipboard_append(url)
+            self.stream_status_label.configure(
+                text=f"📋 تم نسخ الرابط: {url}", text_color="#42a5f5"
+            )
+        except Exception as e:
+            self.stream_status_label.configure(text=f"❌ {e}", text_color="#ef5350")
+
     def _build_monitoring_tab(self):
         tab = self.tabview.tab("المراقبة")
         tab.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(tab, text="حدود التنبيهات",
                      font=ctk.CTkFont(size=15, weight="bold")).pack(pady=(15, 5))
+
+        stream_frame = ctk.CTkFrame(tab)
+        stream_frame.pack(fill="x", padx=20, pady=(0, 10))
+        stream_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            stream_frame,
+            text="📡  بث الشاشة الحي (MJPEG)",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).grid(row=0, column=0, columnspan=3, padx=10, pady=(10, 2), sticky="w")
+        ctk.CTkLabel(
+            stream_frame,
+            text="يتيح مشاهدة شاشتك من أي متصفح عبر الإنترنت",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 8), sticky="w")
+
+        ctk.CTkLabel(stream_frame, text="المنفذ (Port):", width=150, anchor="w").grid(row=2, column=0, padx=10, pady=5)
+        self.stream_port_var = ctk.StringVar(value="8765")
+        ctk.CTkEntry(stream_frame, textvariable=self.stream_port_var, width=100).grid(row=2, column=1, padx=10, pady=5, sticky="w")
+
+        ctk.CTkLabel(stream_frame, text="كلمة المرور:", width=150, anchor="w").grid(row=3, column=0, padx=10, pady=5)
+        self.stream_pass_var = ctk.StringVar(value="pccommander")
+        ctk.CTkEntry(stream_frame, textvariable=self.stream_pass_var, show="●").grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+
+        ctk.CTkLabel(stream_frame, text="FPS:", width=150, anchor="w").grid(row=4, column=0, padx=10, pady=5)
+        self.stream_fps_var = ctk.IntVar(value=5)
+        fps_slider = ctk.CTkSlider(stream_frame, from_=1, to=15, variable=self.stream_fps_var, width=200)
+        fps_slider.grid(row=4, column=1, padx=10, pady=5, sticky="ew")
+        ctk.CTkLabel(stream_frame, textvariable=self.stream_fps_var, width=30).grid(row=4, column=2, padx=5)
+
+        ctk.CTkLabel(stream_frame, text="جودة الصورة (%):", width=150, anchor="w").grid(row=5, column=0, padx=10, pady=5)
+        self.stream_quality_var = ctk.IntVar(value=60)
+        quality_slider = ctk.CTkSlider(stream_frame, from_=20, to=95, variable=self.stream_quality_var, width=200)
+        quality_slider.grid(row=5, column=1, padx=10, pady=5, sticky="ew")
+        ctk.CTkLabel(stream_frame, textvariable=self.stream_quality_var, width=30).grid(row=5, column=2, padx=5)
+
+        ctk.CTkLabel(stream_frame, text="حجم الصورة (Scale):", width=150, anchor="w").grid(row=6, column=0, padx=10, pady=5)
+        self.stream_scale_var = ctk.DoubleVar(value=0.8)
+
+        def _format_scale(v):
+            return f"{float(v):.0%}"
+        scale_slider = ctk.CTkSlider(stream_frame, from_=0.3, to=1.0, variable=self.stream_scale_var, width=200)
+        scale_slider.grid(row=6, column=1, padx=10, pady=5, sticky="ew")
+        self.stream_scale_lbl = ctk.CTkLabel(stream_frame, text="80%", width=35)
+        self.stream_scale_lbl.grid(row=6, column=2, padx=5)
+        scale_slider.configure(command=lambda v: self.stream_scale_lbl.configure(text=f"{float(v):.0%}"))
+
+        stream_btn_row = ctk.CTkFrame(stream_frame, fg_color="transparent")
+        stream_btn_row.grid(row=7, column=0, columnspan=3, pady=10)
+
+        self.stream_toggle_btn = ctk.CTkButton(
+            stream_btn_row, text="▶ تشغيل البث", width=160,
+            fg_color="#2e7d32", hover_color="#1b5e20",
+            command=self._toggle_stream
+        )
+        self.stream_toggle_btn.pack(side="left", padx=8)
+
+        ctk.CTkButton(
+            stream_btn_row, text="🔗 نسخ الرابط", width=130,
+            fg_color="#1565c0", hover_color="#0d47a1",
+            command=self._copy_stream_url
+        ).pack(side="left", padx=8)
+
+        self.stream_status_label = ctk.CTkLabel(
+            stream_frame, text="⏸️ البث متوقف", font=ctk.CTkFont(size=12), text_color="#aaa"
+        )
+        self.stream_status_label.grid(row=8, column=0, columnspan=3, pady=5)
+
+        sep = ctk.CTkLabel(tab, text="", height=5)
+        sep.pack()
+
+        ctk.CTkLabel(tab, text="حدود التنبيهات",
+                     font=ctk.CTkFont(size=13, weight="bold")).pack(pady=(5, 5))
 
         frame = ctk.CTkFrame(tab)
         frame.pack(fill="x", padx=20, pady=5)
@@ -683,6 +803,13 @@ class SettingsWindow(ctk.CTk):
         self.config["monitoring"]["ram_alert_threshold"] = self.monitor_vars["ram_alert"].get()
         self.config["monitoring"]["disk_alert_threshold"] = self.monitor_vars["disk_alert"].get()
         self.config["monitoring"]["temp_alert_threshold"] = self.monitor_vars["temp_alert"].get()
+        if "stream" not in self.config:
+            self.config["stream"] = {}
+        self.config["stream"]["port"]     = int(self.stream_port_var.get() or 8765)
+        self.config["stream"]["password"] = self.stream_pass_var.get() or "pccommander"
+        self.config["stream"]["fps"]      = int(self.stream_fps_var.get())
+        self.config["stream"]["quality"]  = int(self.stream_quality_var.get())
+        self.config["stream"]["scale"]    = float(self.stream_scale_var.get())
 
         save_config(self.config)
         set_startup(self.startup_var.get())

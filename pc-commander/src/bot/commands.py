@@ -159,6 +159,36 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
             else:
                 result_text = "❌ **Pre-Login Agent غير مثبّت**\nافتح الإعدادات ← تسجيل الدخول لتثبيته."
 
+        elif command == "stream_start":
+            from src.streaming.screen_stream import start_stream, get_stream_status
+            result_text = start_stream(config)
+            status = get_stream_status(config)
+            if status["running"]:
+                port = status["port"]
+                result_text += (
+                    f"\n\n🌐 **الوصول للبث:**\n"
+                    f"• شبكة منزلية: `http://localhost:{port}`\n"
+                    f"• عبر الإنترنت: أرسل `/tunnel_start` أولاً للحصول على رابط عام"
+                )
+
+        elif command == "stream_stop":
+            from src.streaming.screen_stream import stop_stream
+            result_text = stop_stream()
+
+        elif command == "stream_status":
+            from src.streaming.screen_stream import get_stream_status
+            status = get_stream_status(config)
+            if status["running"]:
+                port = status["port"]
+                result_text = (
+                    f"📡 **بث الشاشة يعمل**\n\n"
+                    f"🟢 الحالة: نشط\n"
+                    f"🔌 المنفذ: `{port}`\n"
+                    f"🌐 شبكة منزلية: `http://localhost:{port}`"
+                )
+            else:
+                result_text = "⏸️ **بث الشاشة متوقف**\nأرسل /stream_start لتشغيله"
+
         elif command == "chat":
             result_text = args[0] if args else ""
 

@@ -1,0 +1,260 @@
+"""
+PC Commander - Screen Stream Server
+بث الشاشة الحي عبر MJPEG - يمكن فتحه من أي متصفح
+"""
+import io
+import time
+import threading
+import hashlib
+import base64
+from pathlib import Path
+
+try:
+    from flask import Flask, Response, request, abort, render_template_string
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+
+try:
+    from PIL import ImageGrab
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
+from src.utils.logger import get_logger
+
+logger = get_logger()
+
+_stream_server = None
+_stream_thread = None
+_server_lock   = threading.Lock()
+
+HTML_VIEWER = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PC Commander - بث الشاشة</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d0d1a; color: #eee; font-family: 'Segoe UI', sans-serif; }
+  .header {
+    background: #1a1a2e; padding: 12px 20px; display: flex;
+    align-items: center; justify-content: space-between;
+    border-bottom: 2px solid #7c4dff;
+  }
+  .logo { font-size: 18px; font-weight: bold; color: #7c4dff; }
+  .status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: #aaa;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #66bb6a;
+         animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .screen-wrap {
+    display: flex; justify-content: center; align-items: flex-start;
+    padding: 16px; min-height: calc(100vh - 60px);
+  }
+  .screen-img {
+    max-width: 100%; border-radius: 8px;
+    border: 2px solid #333; box-shadow: 0 4px 30px rgba(124,77,255,.3);
+  }
+  .info { position: fixed; bottom: 12px; right: 12px;
+          background: rgba(0,0,0,.6); padding: 6px 12px;
+          border-radius: 20px; font-size: 11px; color: #666; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">🖥️ PC Commander</div>
+  <div class="status"><div class="dot"></div> بث مباشر</div>
+</div>
+<div class="screen-wrap">
+  <img src="/stream" class="screen-img" alt="شاشة الحاسب">
+</div>
+<div class="info">PC Commander &copy; 2024</div>
+</body>
+</html>"""
+
+HTML_LOGIN = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>PC Commander - تسجيل الدخول</title>
+<style>
+  body { background: #0d0d1a; color: #eee; font-family: 'Segoe UI', sans-serif;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .card { background: #1a1a2e; padding: 40px; border-radius: 16px;
+          border: 1px solid #333; width: 320px; text-align: center; }
+  h2 { color: #7c4dff; margin-bottom: 24px; }
+  input { width: 100%; padding: 10px 14px; background: #0d0d1a; border: 1px solid #444;
+          border-radius: 8px; color: #eee; font-size: 14px; margin-bottom: 16px; }
+  button { width: 100%; padding: 11px; background: #7c4dff; color: #fff;
+           border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+  button:hover { background: #651fff; }
+  .err { color: #ef5350; font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🔒 PC Commander</h2>
+  <form method="POST">
+    <input type="password" name="password" placeholder="كلمة المرور" autofocus>
+    <button type="submit">دخول</button>
+  </form>
+  {% if error %}<div class="err">❌ كلمة مرور خاطئة</div>{% endif %}
+</div>
+</body>
+</html>"""
+
+
+def _hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def _capture_frame(quality: int = 60, scale: float = 1.0) -> bytes:
+    if not PIL_AVAILABLE:
+        raise RuntimeError("Pillow غير مثبت")
+    img = ImageGrab.grab()
+    if scale != 1.0:
+        new_w = int(img.width * scale)
+        new_h = int(img.height * scale)
+        img = img.resize((new_w, new_h))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=quality, optimize=True)
+    return buf.getvalue()
+
+
+def _generate_stream(fps: int, quality: int, scale: float):
+    delay = 1.0 / max(fps, 1)
+    while True:
+        try:
+            frame = _capture_frame(quality, scale)
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" +
+                frame +
+                b"\r\n"
+            )
+        except Exception as e:
+            logger.warning(f"خطأ في التقاط الإطار: {e}")
+        time.sleep(delay)
+
+
+def create_stream_app(password_hash: str, fps: int, quality: int, scale: float) -> Flask:
+    app = Flask(__name__)
+    app.secret_key = password_hash[:32]
+
+    SESSION_COOKIE = "pcc_auth"
+
+    def is_authenticated():
+        token = request.cookies.get(SESSION_COOKIE)
+        return token == password_hash
+
+    @app.route("/", methods=["GET", "POST"])
+    def index():
+        if is_authenticated():
+            return render_template_string(HTML_VIEWER)
+        if request.method == "POST":
+            pwd = request.form.get("password", "")
+            if _hash_password(pwd) == password_hash:
+                resp = Response(render_template_string(HTML_VIEWER))
+                resp.set_cookie(SESSION_COOKIE, password_hash, httponly=True)
+                return resp
+            return render_template_string(HTML_LOGIN, error=True)
+        return render_template_string(HTML_LOGIN, error=False)
+
+    @app.route("/stream")
+    def stream():
+        if not is_authenticated():
+            abort(403)
+        return Response(
+            _generate_stream(fps, quality, scale),
+            mimetype="multipart/x-mixed-replace; boundary=frame"
+        )
+
+    @app.route("/health")
+    def health():
+        return {"status": "ok", "service": "PC Commander Stream"}, 200
+
+    return app
+
+
+class ScreenStreamServer:
+    def __init__(self, port: int, password: str, fps: int, quality: int, scale: float):
+        self.port     = port
+        self.fps      = fps
+        self.quality  = quality
+        self.scale    = scale
+        self._phash   = _hash_password(password)
+        self._thread  = None
+        self._running = False
+        self._app     = None
+
+    def start(self) -> bool:
+        if self._running:
+            return True
+        if not FLASK_AVAILABLE:
+            raise RuntimeError("Flask غير مثبت - شغّل: pip install flask")
+        if not PIL_AVAILABLE:
+            raise RuntimeError("Pillow غير مثبت - شغّل: pip install Pillow")
+
+        self._app = create_stream_app(self._phash, self.fps, self.quality, self.scale)
+
+        import werkzeug.serving
+        self._server = werkzeug.serving.make_server(
+            "0.0.0.0", self.port, self._app, threaded=True
+        )
+        self._running = True
+        self._thread  = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+        logger.info(f"✅ Screen stream بدأ على المنفذ {self.port}")
+        return True
+
+    def stop(self):
+        if self._running and self._server:
+            self._server.shutdown()
+        self._running = False
+        logger.info("⏹ Screen stream توقف")
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+
+def start_stream(config: dict) -> str:
+    global _stream_server
+    with _server_lock:
+        if _stream_server and _stream_server.is_running:
+            return "⚠️ البث يعمل بالفعل"
+
+        sc  = config.get("stream", {})
+        port    = int(sc.get("port", 8765))
+        password= sc.get("password", "pccommander")
+        fps     = int(sc.get("fps", 5))
+        quality = int(sc.get("quality", 60))
+        scale   = float(sc.get("scale", 0.8))
+
+        _stream_server = ScreenStreamServer(port, password, fps, quality, scale)
+        try:
+            _stream_server.start()
+            return f"✅ تم تشغيل البث\n🌐 متاح على المنفذ: {port}"
+        except Exception as e:
+            return f"❌ فشل تشغيل البث: {e}"
+
+
+def stop_stream() -> str:
+    global _stream_server
+    with _server_lock:
+        if not _stream_server or not _stream_server.is_running:
+            return "⚠️ البث ليس يعمل"
+        _stream_server.stop()
+        _stream_server = None
+        return "⏹ تم إيقاف البث"
+
+
+def get_stream_status(config: dict) -> dict:
+    global _stream_server
+    port    = int(config.get("stream", {}).get("port", 8765))
+    running = bool(_stream_server and _stream_server.is_running)
+    return {"running": running, "port": port}

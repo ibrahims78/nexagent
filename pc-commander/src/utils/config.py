@@ -53,6 +53,14 @@ DEFAULT_CONFIG = {
     "security": {
         "log_commands": True,
         "notify_on_unauthorized": True
+    },
+    "stream": {
+        "enabled": False,
+        "port": 8765,
+        "password": "pccommander",
+        "fps": 5,
+        "quality": 60,
+        "scale": 0.8
     }
 }
 
