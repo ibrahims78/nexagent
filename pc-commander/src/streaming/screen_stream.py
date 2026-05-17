@@ -113,7 +113,7 @@ def _hash_password(password: str) -> str:
 
 def _capture_frame(quality: int = 60, scale: float = 1.0) -> bytes:
     if not PIL_AVAILABLE:
-        raise RuntimeError("Pillow غير مثبت")
+        raise RuntimeError("Pillow is not installed")
     img = ImageGrab.grab()
     if scale != 1.0:
         new_w = int(img.width * scale)
@@ -236,9 +236,9 @@ class ScreenStreamServer:
         if self._running:
             return True
         if not FLASK_AVAILABLE:
-            raise RuntimeError("Flask غير مثبت - شغّل: pip install flask")
+            raise RuntimeError("Flask is not installed — run: pip install flask")
         if not PIL_AVAILABLE:
-            raise RuntimeError("Pillow غير مثبت - شغّل: pip install Pillow")
+            raise RuntimeError("Pillow is not installed — run: pip install Pillow")
 
         self._app = create_stream_app(self._phash, self.fps, self.quality, self.scale)
 

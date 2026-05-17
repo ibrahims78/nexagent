@@ -5,26 +5,25 @@ color 0B
 
 echo.
 echo  ╔══════════════════════════════════════════════╗
-echo  ║     إعداد Pre-Login Agent                    ║
-echo  ║     سكريبت الإشعار عند الإقلاع              ║
+echo  ║     Pre-Login Agent Setup                    ║
+echo  ║     Boot Notification Script                 ║
 echo  ╚══════════════════════════════════════════════╝
 echo.
 
 :: Check admin
 net session >nul 2>&1
 if errorlevel 1 (
-    echo  [ERROR] يجب تشغيل هذا الملف كـ Administrator
-    echo  انقر بالزر الأيمن واختر "تشغيل كمسؤول"
+    echo  [ERROR] Must run as Administrator. Right-click and choose "Run as administrator"
     pause
     exit /b 1
 )
 
-echo  [1/4] تثبيت المتطلبات...
+echo  [1/4] Installing requirements...
 pip install python-telegram-bot==20.7 pywin32 --quiet
-echo  [OK] تم التثبيت
+echo  [OK] Requirements installed
 
 echo.
-echo  [2/4] بناء ملف exe...
+echo  [2/4] Building executable...
 pyinstaller --noconfirm --onefile --noconsole ^
     --name "PCCommander_PreLogin" ^
     --hidden-import "win32api" ^
@@ -33,15 +32,15 @@ pyinstaller --noconfirm --onefile --noconsole ^
     pre_login_agent.py
 
 if errorlevel 1 (
-    echo  [WARN] فشل بناء exe - سيعمل كـ Python script
+    echo  [WARN] EXE build failed - will run as Python script
     set AGENT_PATH=python "%~dp0pre_login_agent.py"
 ) else (
     set AGENT_PATH="%~dp0dist\PCCommander_PreLogin.exe"
-    echo  [OK] تم بناء exe
+    echo  [OK] EXE built successfully
 )
 
 echo.
-echo  [3/4] إنشاء مهمة مجدولة في ويندوز...
+echo  [3/4] Creating Windows scheduled task...
 
 :: Create scheduled task that runs at system startup (before login)
 schtasks /create /tn "PCCommander_PreLogin" ^
@@ -53,28 +52,28 @@ schtasks /create /tn "PCCommander_PreLogin" ^
     /delay 0000:30
 
 if errorlevel 1 (
-    echo  [ERROR] فشل إنشاء المهمة المجدولة
+    echo  [ERROR] Failed to create scheduled task
     pause
     exit /b 1
 )
 
-echo  [OK] تم إنشاء المهمة المجدولة
+echo  [OK] Scheduled task created
 
 echo.
-echo  [4/4] التحقق من الإعداد...
+echo  [4/4] Verifying setup...
 schtasks /query /tn "PCCommander_PreLogin" /fo LIST | findstr "Status"
 
 echo.
 echo  ╔══════════════════════════════════════════════╗
-echo  ║         تم الإعداد بنجاح!                    ║
+echo  ║         Setup complete!                      ║
 echo  ╚══════════════════════════════════════════════╝
 echo.
-echo  ما الذي سيحدث عند كل إقلاع:
-echo  1. ويندوز يبدأ الإقلاع
-echo  2. السكريبت يعمل تلقائياً
-echo  3. ينتظر الإنترنت
-echo  4. يرسل إشعاراً لتيليغرام
-echo  5. تضغط "سجّل الدخول" من أي مكان
-echo  6. يدخل ويندوز تلقائياً
+echo  What happens on every boot:
+echo  1. Windows starts booting
+echo  2. This script runs automatically
+echo  3. Waits for internet connection
+echo  4. Sends a Telegram notification
+echo  5. You tap "Login" from anywhere
+echo  6. Windows logs in automatically
 echo.
 pause

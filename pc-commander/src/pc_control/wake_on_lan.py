@@ -8,7 +8,7 @@ logger = get_logger()
 def send_magic_packet(mac_address: str, broadcast_ip: str = "255.255.255.255", port: int = 9) -> bool:
     mac_clean = re.sub(r"[:\-\.]", "", mac_address).upper()
     if len(mac_clean) != 12:
-        raise ValueError(f"عنوان MAC غير صالح: {mac_address}")
+        raise ValueError(f"Invalid MAC address: {mac_address}")
 
     mac_bytes = bytes.fromhex(mac_clean)
     magic_packet = b"\xFF" * 6 + mac_bytes * 16

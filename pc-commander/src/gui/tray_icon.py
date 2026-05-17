@@ -33,9 +33,9 @@ class TrayIcon:
             menu = pystray.Menu(
                 pystray.MenuItem("🖥️ NexAgent", lambda: None, enabled=False),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("فتح الإعدادات", self._on_show),
+                pystray.MenuItem("Open Settings / فتح الإعدادات", self._on_show),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("إنهاء البرنامج", self._on_quit)
+                pystray.MenuItem("Exit / إنهاء", self._on_quit)
             )
             self.icon = pystray.Icon("NexAgent", image, "NexAgent", menu)
             self.icon.run()

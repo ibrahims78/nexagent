@@ -18,7 +18,7 @@ def take_screenshot() -> bytes:
         buf.seek(0)
         return buf.read()
     except Exception as e:
-        raise RuntimeError(f"فشل أخذ لقطة الشاشة: {e}")
+        raise RuntimeError(f"Screenshot failed: {e}")
 
 
 def take_screenshot_file() -> str:

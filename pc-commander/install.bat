@@ -5,9 +5,8 @@ title NexAgent — Installer
 
 echo.
 echo  ╔═══════════════════════════════════════════════════════╗
-echo  ║              NexAgent — المثبّت الموحد               ║
-echo  ║         التحكم الكامل بالحاسب عبر تيليغرام          ║
-echo  ║   الطبقة الأولى: بوت AI  +  الطبقة الثانية: SSH     ║
+echo  ║     NexAgent Unified Installer                        ║
+echo  ║     Remote PC Control via Telegram + SSH              ║
 echo  ╚═══════════════════════════════════════════════════════╝
 echo.
 
@@ -16,8 +15,8 @@ echo.
 :: ─────────────────────────────────────────────────────
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  [!] يتطلب هذا المثبّت صلاحيات المدير.
-    echo      انقر بزر الفأرة الأيمن على install.bat واختر "تشغيل كمسؤول"
+    echo  [!] This installer requires Administrator rights.
+    echo      Right-click install.bat and choose "Run as administrator"
     echo.
     pause
     exit /b 1
@@ -30,9 +29,9 @@ echo  [0/6] صلاحيات المدير... موجودة
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
-    echo  [!] Python غير موجود أو غير مضاف لـ PATH.
-    echo      قم بتنزيله من: https://python.org/downloads
-    echo      تأكد من تفعيل "Add Python to PATH" أثناء التثبيت.
+    echo  [!] Python not found or not in PATH.
+    echo      Download from: https://python.org/downloads
+    echo      During install: check "Add Python to PATH"
     echo.
     pause
     exit /b 1
@@ -47,7 +46,7 @@ echo.
 echo  [2/6] تثبيت المكتبات المطلوبة (requirements.txt)...
 pip install -r "%~dp0requirements.txt" --quiet --disable-pip-version-check
 if %errorlevel% neq 0 (
-    echo  [!] فشل تثبيت المكتبات. تحقق من اتصال الإنترنت ثم أعد المحاولة.
+    echo  [!] Dependency installation failed. Check internet connection and retry.
     pause
     exit /b 1
 )
@@ -122,7 +121,7 @@ if /i "%STARTUP%"=="y" (
 :: ─────────────────────────────────────────────────────
 echo.
 echo  ╔═══════════════════════════════════════════════════════╗
-echo  ║              اكتمل التثبيت بنجاح!                   ║
+echo  ║          Installation complete!                       ║
 echo  ╚═══════════════════════════════════════════════════════╝
 echo.
 echo  الخطوات التالية:
