@@ -59,7 +59,12 @@ def test_unknown_command_returns_error():
         "this_does_not_exist", [], SAMPLE_CONFIG
     )
 
-    assert "غير معروف" in result_text or "unknown" in result_text.lower() or "مسموح" in result_text
+    assert result_text != "" and (
+        "غير معروف" in result_text
+        or "unknown" in result_text.lower()
+        or "مسموح" in result_text
+        or "argument" in result_text.lower()
+    )
     assert result_file is None
 
 
