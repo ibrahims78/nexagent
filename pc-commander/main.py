@@ -55,7 +55,7 @@ def main():
             window.set_running_status(True)
             window.withdraw()
         except Exception as e:
-            logger.error(f"فشل التشغيل التلقائي: {e}")
+            logger.error(f"Auto-start failed: {e}")
 
     window.mainloop()
 

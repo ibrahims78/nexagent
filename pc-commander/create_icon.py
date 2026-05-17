@@ -52,7 +52,7 @@ def create_icon():
         append_images=images[1:]
     )
     images[-1].save("assets/logo.png")
-    print("✅ تم إنشاء الأيقونة: assets/icon.ico")
+    print("Icon created: assets/icon.ico")
 
 
 if __name__ == "__main__":
