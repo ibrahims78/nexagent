@@ -88,6 +88,16 @@ def execute_command(
             path = args[0] if args else ""
             result_text = file_manager.delete_file(path)
 
+        elif command == "copy_file":
+            src = args[0] if args else ""
+            dst = args[1] if len(args) > 1 else ""
+            result_text = file_manager.copy_file(src, dst)
+
+        elif command == "move_file":
+            src = args[0] if args else ""
+            dst = args[1] if len(args) > 1 else ""
+            result_text = file_manager.move_file(src, dst)
+
         elif command == "open_file":
             path = args[0] if args else ""
             result_text = file_manager.open_file(path)

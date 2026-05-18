@@ -107,7 +107,7 @@ class TaskScheduler:
     def _execute_scheduled(self, command: str):
         from src.bot.commands import execute_command
         try:
-            result_text, _ = execute_command(command, [], self.config)
+            result_text, _ = execute_command(command, [], self.config, bot=self.bot)
             if self.bot:
                 try:
                     asyncio.run(self.bot.send_notification(

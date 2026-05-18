@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime
 from src.utils.config import get_logs_dir
 
@@ -7,14 +8,20 @@ def get_logger(name: str = "NexAgent") -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         logs_dir = get_logs_dir()
-        log_file = logs_dir / f"commander_{datetime.now().strftime('%Y%m%d')}.log"
+        log_file = logs_dir / "commander.log"
 
         formatter = logging.Formatter(
             "[%(asctime)s] [%(levelname)s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
         )
 
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler = TimedRotatingFileHandler(
+            log_file,
+            when="midnight",
+            backupCount=30,
+            encoding="utf-8",
+        )
+        file_handler.suffix = "%Y%m%d"
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
