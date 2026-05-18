@@ -12,9 +12,6 @@ IS_WINDOWS = sys.platform == "win32"
 AUTOLOGON_URL = "https://live.sysinternals.com/Autologon.exe"
 AUTOLOGON_PATH = Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "PCCommander" / "Autologon.exe"
 
-# Pin a known hash by replacing "KNOWN_HASH_HERE" with the value logged on first successful download.
-AUTOLOGON_SHA256 = "KNOWN_HASH_HERE"
-
 
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -35,11 +32,21 @@ def download_autologon() -> bool:
                 AUTOLOGON_PATH.unlink(missing_ok=True)
                 return False
             actual_hash = _sha256_file(AUTOLOGON_PATH)
-            logger.info(f"Autologon.exe SHA256: {actual_hash}")
-            if AUTOLOGON_SHA256 != "KNOWN_HASH_HERE" and actual_hash != AUTOLOGON_SHA256:
-                logger.error(f"Autologon.exe integrity check FAILED: {actual_hash}")
-                AUTOLOGON_PATH.unlink(missing_ok=True)
-                return False
+            from src.utils.config import get_config_dir
+            hash_file = get_config_dir() / "autologon_hash.txt"
+            if hash_file.exists():
+                known = hash_file.read_text().strip()
+                if known != actual_hash:
+                    logger.warning(
+                        f"Autologon.exe hash CHANGED: was {known}, now {actual_hash}. "
+                        "This may indicate a legitimate update from Sysinternals or tampering. "
+                        "Delete autologon_hash.txt to accept the new version."
+                    )
+                    AUTOLOGON_PATH.unlink(missing_ok=True)
+                    return False
+            else:
+                hash_file.write_text(actual_hash)
+                logger.info(f"Autologon.exe hash stored for future verification: {actual_hash}")
         return AUTOLOGON_PATH.exists()
     except Exception as e:
         logger.error(f"Failed to download Autologon: {e}")
