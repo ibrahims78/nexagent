@@ -19,6 +19,9 @@ venv/
 nexagent_config.ini
 pc-commander/nexagent_config.ini
 SshRemote_V2/sshremote_config.ini
+pc-commander/core/sshremote_config.ini
+**/sshremote_config.ini
+!**/sshremote_config.ini.template
 pre_login/pre_login_config.json
 
 # Encrypted config & keys
