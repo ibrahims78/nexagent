@@ -38,6 +38,7 @@ class PCCommanderBot:
         self.app = None
         self.conversation_context: collections.OrderedDict[int, list] = collections.OrderedDict()
         self.last_activity: dict[int, float] = {}
+        self._context_lock = threading.Lock()
         self._running = False
         self._thread = None
 
@@ -46,8 +47,8 @@ class PCCommanderBot:
             return False
         return user_id in self.allowed_users
 
-    def _trim_context_cache(self) -> None:
-        """Evict stale entries first, then oldest by insertion order if still over limit."""
+    def _trim_context_unsafe(self) -> None:
+        """Evict stale entries — caller must hold self._context_lock."""
         now = time.time()
         stale = [
             uid for uid, ts in self.last_activity.items()
@@ -56,9 +57,13 @@ class PCCommanderBot:
         for uid in stale:
             self.conversation_context.pop(uid, None)
             self.last_activity.pop(uid, None)
-
         while len(self.conversation_context) > MAX_USERS_CONTEXT:
             self.conversation_context.popitem(last=False)
+
+    def _trim_context_cache(self) -> None:
+        """Thread-safe wrapper — acquires lock then trims."""
+        with self._context_lock:
+            self._trim_context_unsafe()
 
     async def _check_auth_and_session(self, update: Update) -> bool:
         user = update.effective_user
@@ -102,7 +107,8 @@ class PCCommanderBot:
         update: Update,
         context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        self.last_activity[user_id] = time.time()
+        with self._context_lock:
+            self.last_activity[user_id] = time.time()
         refresh_session(user_id)
 
         if self.config.get("general", {}).get("do_not_disturb", False):
@@ -113,7 +119,8 @@ class PCCommanderBot:
 
         await context.bot.send_chat_action(update.effective_chat.id, action="typing")
 
-        ctx = self.conversation_context.get(user_id, [])
+        with self._context_lock:
+            ctx = list(self.conversation_context.get(user_id, []))
 
         try:
             ai_result = self.ai_handler.process_command(text, ctx)
@@ -124,11 +131,11 @@ class PCCommanderBot:
             ctx.append({"role": "user", "content": text})
             ctx.append({"role": "assistant", "content": ai_response})
 
-            self.conversation_context[user_id] = ctx[-10:]
-            self.conversation_context.move_to_end(user_id)
-
-            if len(self.conversation_context) > MAX_USERS_CONTEXT:
-                self._trim_context_cache()
+            with self._context_lock:
+                self.conversation_context[user_id] = ctx[-10:]
+                self.conversation_context.move_to_end(user_id)
+                if len(self.conversation_context) > MAX_USERS_CONTEXT:
+                    self._trim_context_unsafe()
 
             if command != "chat":
                 result_text, result_file = execute_command(command, args, self.config)

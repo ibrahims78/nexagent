@@ -150,8 +150,13 @@ def request_pin_auth(user_id: int, config: dict) -> str:
         create_session(user_id)
         return "SESSION_CREATED"
     with _lock:
+        now = time.time()
+        expired = [uid for uid, p in list(_pending_pin.items())
+                   if now > p.get("expires_at", 0)]
+        for uid in expired:
+            del _pending_pin[uid]
         _pending_pin[user_id] = {
-            "expires_at": time.time() + PIN_TIMEOUT,
+            "expires_at": now + PIN_TIMEOUT,
             "attempts": 0
         }
     return "PIN_REQUIRED"

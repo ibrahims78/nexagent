@@ -8,6 +8,9 @@ import threading
 import hashlib
 import secrets
 
+_cleanup_thread_started = False
+_cleanup_thread_lock = threading.Lock()
+
 try:
     from flask import Flask, Response, request, abort, render_template_string
     FLASK_AVAILABLE = True
@@ -178,10 +181,14 @@ def create_stream_app(password_hash: str, fps: int, quality: int, scale: float) 
             time.sleep(3600)
             _cleanup_sessions()
 
-    _cleanup_thread = threading.Thread(
-        target=_periodic_cleanup, daemon=True, name="StreamSessionCleanup"
-    )
-    _cleanup_thread.start()
+    global _cleanup_thread_started
+    with _cleanup_thread_lock:
+        if not _cleanup_thread_started:
+            _cleanup_thread_started = True
+            _cleanup_thread = threading.Thread(
+                target=_periodic_cleanup, daemon=True, name="StreamSessionCleanup"
+            )
+            _cleanup_thread.start()
 
     @app.route("/", methods=["GET", "POST"])
     def index():

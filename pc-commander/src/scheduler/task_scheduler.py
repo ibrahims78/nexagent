@@ -144,5 +144,5 @@ class TaskScheduler:
                     id=f"task_{name}",
                     replace_existing=True
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to restore scheduled task '{name}': {e}")

@@ -38,8 +38,8 @@ class NetworkMonitor:
                         asyncio.run(self.bot.send_notification(
                             "✅ **عاد الاتصال بالإنترنت**\nجميع الخدمات تعمل الآن."
                         ))
-                    except RuntimeError:
-                        pass
+                    except Exception as e:
+                        logger.error(f"Failed to send reconnection notification: {e}")
             time.sleep(self.check_interval)
 
     def _check_connection(self) -> bool:

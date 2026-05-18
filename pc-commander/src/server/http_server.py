@@ -16,6 +16,22 @@ RATE_LIMIT_MAX = 60
 RATE_WINDOW    = 60
 
 
+def _cleanup_rate_limits():
+    """Periodically evict IPs whose rate-limit windows have fully expired."""
+    while True:
+        time.sleep(300)
+        with _rate_lock:
+            now = time.time()
+            stale = [ip for ip, events in list(_rate_limits.items())
+                     if not any(now - t < RATE_WINDOW for t in events)]
+            for ip in stale:
+                del _rate_limits[ip]
+
+
+threading.Thread(target=_cleanup_rate_limits, daemon=True,
+                 name="RateLimitCleanup").start()
+
+
 def set_command_handler(handler):
     global _command_handler
     _command_handler = handler

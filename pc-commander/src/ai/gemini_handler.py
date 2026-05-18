@@ -1,5 +1,6 @@
 import google.generativeai as genai
 import json
+import re
 import io
 
 SYSTEM_PROMPT_AR = """أنت مساعد ذكاء اصطناعي متخصص في التحكم بحاسب شخصي يعمل بنظام ويندوز.
@@ -68,10 +69,13 @@ class GeminiHandler:
             chat = self.model.start_chat(history=history)
             response = chat.send_message(user_message)
             text = response.text.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:].strip()
+            match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+            if match:
+                text = match.group(1).strip()
+            else:
+                obj_match = re.search(r'\{.*\}', text, re.DOTALL)
+                if obj_match:
+                    text = obj_match.group(0)
             return json.loads(text)
         except json.JSONDecodeError:
             return {"command": "chat", "args": [], "response": response.text}
