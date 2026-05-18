@@ -45,7 +45,7 @@ def get_system_status() -> str:
     return status
 
 
-def get_daily_report() -> str:
+def get_daily_report(config: dict = None) -> str:
     cpu = psutil.cpu_percent(interval=2)
     ram = psutil.virtual_memory()
     disk = psutil.disk_usage(_SYSTEM_DRIVE)
@@ -58,7 +58,7 @@ def get_daily_report() -> str:
     report += f"🌐 الشبكة: ↑{_human_size(net.bytes_sent)} ↓{_human_size(net.bytes_recv)}\n"
     report += f"⏱️ وقت التشغيل: {_get_uptime()}\n"
 
-    alerts = check_alerts()
+    alerts = check_alerts(config)
     if alerts:
         report += "\n⚠️ **تنبيهات:**\n" + "\n".join(alerts)
 

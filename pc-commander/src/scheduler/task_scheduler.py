@@ -50,7 +50,7 @@ class TaskScheduler:
     def _send_daily_report(self):
         from src.pc_control.system_monitor import get_daily_report
         try:
-            report = get_daily_report()
+            report = get_daily_report(self.config)
             if self.bot:
                 try:
                     asyncio.run(self.bot.send_notification(report))

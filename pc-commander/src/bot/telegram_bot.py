@@ -77,8 +77,10 @@ class PCCommanderBot:
         allowed, reason = check_authorization(uid, self.config)
 
         if not allowed:
+            msg = update.effective_message
             if reason == "NOT_ALLOWED":
-                await update.message.reply_text("⛔ غير مصرح لك باستخدام هذا البوت.")
+                if msg:
+                    await msg.reply_text("⛔ غير مصرح لك باستخدام هذا البوت.")
                 if self.config.get("security", {}).get("notify_on_unauthorized", True):
                     for admin in self.allowed_users:
                         try:
@@ -91,18 +93,21 @@ class PCCommanderBot:
                         except Exception:
                             pass
             elif reason == "BLOCKED":
-                await update.message.reply_text("🚫 تم حجبك. تواصل مع المسؤول.")
+                if msg:
+                    await msg.reply_text("🚫 تم حجبك. تواصل مع المسؤول.")
             elif reason == "RATE_LIMITED":
-                await update.message.reply_text("⏳ أرسلت أوامر كثيرة. انتظر دقيقة.")
+                if msg:
+                    await msg.reply_text("⏳ أرسلت أوامر كثيرة. انتظر دقيقة.")
             elif reason == "NO_SESSION":
                 status = request_pin_auth(uid, self.config)
                 if status == "SESSION_CREATED":
                     return True
-                await update.message.reply_text(
-                    "🔐 **مطلوب رمز PIN للدخول**\n\n"
-                    "أرسل الرمز السري للمتابعة.\n"
-                    "⚠️ تنتهي المهلة خلال دقيقتين."
-                )
+                if msg:
+                    await msg.reply_text(
+                        "🔐 **مطلوب رمز PIN للدخول**\n\n"
+                        "أرسل الرمز السري للمتابعة.\n"
+                        "⚠️ تنتهي المهلة خلال دقيقتين."
+                    )
             return False
         return True
 
@@ -369,6 +374,7 @@ class PCCommanderBot:
         asyncio.run(self._async_run())
 
     async def _async_run(self):
+        self._loop = asyncio.get_running_loop()
         self.app = Application.builder().token(self.token).build()
 
         self.app.add_handler(CommandHandler("start", self.start_command))
@@ -414,12 +420,12 @@ class PCCommanderBot:
         self._running = False
         if self.app:
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
+                loop = getattr(self, "_loop", None)
+                if loop and loop.is_running():
                     loop.call_soon_threadsafe(
                         lambda: loop.create_task(self.app.stop())
                     )
-                else:
+                elif loop:
                     loop.run_until_complete(self.app.stop())
             except Exception as e:
                 logger.warning(f"Bot stop warning: {e}")

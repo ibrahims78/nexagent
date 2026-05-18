@@ -126,7 +126,7 @@ def execute_command(
             result_text = system_monitor.get_system_status()
 
         elif command == "daily_report":
-            result_text = system_monitor.get_daily_report()
+            result_text = system_monitor.get_daily_report(config)
 
         elif command == "anydesk_start":
             anydesk_path = config.get("anydesk", {}).get("path", "")
