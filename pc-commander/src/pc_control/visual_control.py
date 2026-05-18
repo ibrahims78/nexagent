@@ -80,8 +80,15 @@ def _right_click(x: int, y: int):
 
 
 def _type_text(text: str):
-    import pyautogui
-    pyautogui.typewrite(text, interval=0.05)
+    """Type text. Uses clipboard paste to support Unicode/Arabic characters."""
+    try:
+        import pyperclip
+        import pyautogui
+        pyperclip.copy(text)
+        pyautogui.hotkey("ctrl", "v")
+    except Exception:
+        import pyautogui
+        pyautogui.typewrite(text, interval=0.05)
 
 
 def _press_key(key: str):

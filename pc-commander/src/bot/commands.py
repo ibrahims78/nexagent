@@ -18,7 +18,13 @@ def set_ssh_executor(executor) -> None:
     _ssh_executor = executor
 
 
-def execute_command(command: str, args: list, config: dict) -> tuple:
+def execute_command(
+    command: str,
+    args: list,
+    config: dict,
+    user_id: int = None,
+    bot=None,
+) -> tuple:
     """
     Dispatch a command string to the appropriate PC-control function.
     Returns (result_text, result_file_path_or_None).
@@ -129,7 +135,13 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
             result_text = wol_command(config)
 
         elif command == "wol_notify":
-            result_text = "📲 سيتم إرسال إشعار للشخص الاحتياطي في المنزل..."
+            if bot:
+                from src.utils.wol_notifier import WoLNotifier
+                notifier = WoLNotifier(bot=bot, config=config)
+                notifier.notify_async(user_id)
+                result_text = "📲 تم إرسال إشعار للشخص الاحتياطي في المنزل لتشغيل الحاسب"
+            else:
+                result_text = "❌ الإشعار غير متاح في هذا السياق"
 
         elif command == "wol_status":
             result_text = _wol_check_status(config)
@@ -245,7 +257,7 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
                 result_text += (
                     f"\n\n🌐 **الوصول للبث:**\n"
                     f"• شبكة منزلية: `http://localhost:{port}`\n"
-                    f"• عبر الإنترنت: أرسل `/tunnel_start` أولاً للحصول على رابط عام"
+                    f"• عبر الإنترنت: النفق يعمل تلقائياً — تحقق من السجلات للرابط العام"
                 )
 
         elif command == "stream_stop":
@@ -298,7 +310,9 @@ def execute_command(command: str, args: list, config: dict) -> tuple:
 
         elif command == "logout":
             from src.utils.security_auth import invalidate_session
-            invalidate_session(args[0] if args else 0)
+            uid = user_id if user_id is not None else (int(args[0]) if args and str(args[0]).isdigit() else None)
+            if uid:
+                invalidate_session(uid)
             result_text = "🔒 تم إنهاء الجلسة"
 
         elif command == "chat":

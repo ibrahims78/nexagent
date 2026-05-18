@@ -22,6 +22,10 @@ class WoLNotifier:
     async def notify_backup_person(self, requester_id: int = None):
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+        if not self.bot or not getattr(self.bot, "app", None):
+            logger.warning("WoLNotifier: bot or bot.app is not available")
+            return False
+
         backup_users = self.get_backup_users()
         if not backup_users:
             return False
@@ -67,6 +71,8 @@ class WoLNotifier:
         t.start()
 
     async def notify_wol_success(self, target_users: list):
+        if not self.bot or not getattr(self.bot, "app", None):
+            return
         message = "✅ **الحاسب المنزلي جاهز الآن!**\nيمكنك البدء باستخدامه."
         for uid in target_users:
             try:

@@ -144,7 +144,7 @@ class PCCommanderBot:
                     self._trim_context_unsafe()
 
             if command != "chat":
-                result_text, result_file = execute_command(command, args, self.config)
+                result_text, result_file = execute_command(command, args, self.config, user_id=user_id, bot=self)
 
                 if self.config.get("security", {}).get("log_commands", True):
                     log_command(
@@ -311,7 +311,7 @@ class PCCommanderBot:
             idx = int(data.split("_")[1])
             if idx < len(QUICK_COMMANDS_AR):
                 _, command = QUICK_COMMANDS_AR[idx]
-                result_text, result_file = execute_command(command, [], self.config)
+                result_text, result_file = execute_command(command, [], self.config, user_id=query.from_user.id, bot=self)
                 if result_file and os.path.exists(result_file):
                     with open(result_file, "rb") as f:
                         await query.message.reply_photo(f, caption=result_text or "")
@@ -343,7 +343,7 @@ class PCCommanderBot:
                     await query.message.reply_text("❌ فشل الإرسال. تأكد من الواي فاي.")
 
         elif data == "wol_start":
-            result_text, _ = execute_command("wol_start", [], self.config)
+            result_text, _ = execute_command("wol_start", [], self.config, user_id=query.from_user.id, bot=self)
             await query.message.reply_text(result_text, parse_mode="Markdown")
             wol_cfg = self.config.get("wol", {})
             if wol_cfg.get("auto_notify_backup", True) and wol_cfg.get("backup_users"):

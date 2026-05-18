@@ -131,9 +131,11 @@ def _capture_frame(quality: int = 60, scale: float = 1.0) -> bytes:
 
 def _generate_stream(fps: int, quality: int, scale: float):
     delay = 1.0 / max(fps, 1)
+    consecutive_errors = 0
     while True:
         try:
             frame = _capture_frame(quality, scale)
+            consecutive_errors = 0
             yield (
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" +
@@ -141,7 +143,9 @@ def _generate_stream(fps: int, quality: int, scale: float):
                 b"\r\n"
             )
         except Exception as e:
-            logger.warning(f"Frame capture error: {e}")
+            consecutive_errors += 1
+            if consecutive_errors <= 3 or consecutive_errors % 60 == 0:
+                logger.warning(f"Frame capture error ({consecutive_errors}x): {e}")
         time.sleep(delay)
 
 
