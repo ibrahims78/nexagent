@@ -312,49 +312,57 @@ class PCCommanderBot:
             return
 
         data = query.data
-        if data.startswith("quick_"):
-            idx = int(data.split("_")[1])
-            if idx < len(QUICK_COMMANDS_AR):
-                _, command = QUICK_COMMANDS_AR[idx]
-                result_text, result_file = execute_command(command, [], self.config, user_id=query.from_user.id, bot=self)
-                if result_file and os.path.exists(result_file):
-                    with open(result_file, "rb") as f:
-                        await query.message.reply_photo(f, caption=result_text or "")
-                else:
-                    await query.message.reply_text(
-                        result_text or "✅ تم", parse_mode="Markdown"
-                    )
+        try:
+            if data.startswith("quick_"):
+                idx = int(data.split("_")[1])
+                if idx < len(QUICK_COMMANDS_AR):
+                    _, command = QUICK_COMMANDS_AR[idx]
+                    result_text, result_file = execute_command(command, [], self.config, user_id=query.from_user.id, bot=self)
+                    if result_file and os.path.exists(result_file):
+                        with open(result_file, "rb") as f:
+                            await query.message.reply_photo(f, caption=result_text or "")
+                    else:
+                        await query.message.reply_text(
+                            result_text or "✅ تم", parse_mode="Markdown"
+                        )
 
-        elif data.startswith("wol_manual_"):
-            parts = data.split("_", 3)
-            mac = parts[2] if len(parts) > 2 else ""
-            broadcast = parts[3] if len(parts) > 3 else "255.255.255.255"
-            if mac:
-                from src.pc_control.wake_on_lan import send_magic_packet
-                success = send_magic_packet(mac, broadcast)
-                if success:
-                    await query.message.reply_text(
-                        "✅ **تم إرسال إشارة التشغيل!**\n"
-                        "⏳ الحاسب يحتاج 30-60 ثانية للإقلاع.",
-                        parse_mode="Markdown"
-                    )
-                    wol_cfg = self.config.get("wol", {})
-                    pc_ip = wol_cfg.get("pc_ip", "")
-                    if pc_ip and wol_cfg.get("monitor_startup", True):
-                        from src.utils.wol_notifier import WoLNotifier
-                        notifier = WoLNotifier(bot=self, config=self.config)
-                        notifier.monitor_pc_startup(pc_ip, self.allowed_users)
-                else:
-                    await query.message.reply_text("❌ فشل الإرسال. تأكد من الواي فاي.")
+            elif data.startswith("wol_manual_"):
+                parts = data.split("_", 3)
+                mac = parts[2] if len(parts) > 2 else ""
+                broadcast = parts[3] if len(parts) > 3 else "255.255.255.255"
+                if mac:
+                    from src.pc_control.wake_on_lan import send_magic_packet
+                    success = send_magic_packet(mac, broadcast)
+                    if success:
+                        await query.message.reply_text(
+                            "✅ **تم إرسال إشارة التشغيل!**\n"
+                            "⏳ الحاسب يحتاج 30-60 ثانية للإقلاع.",
+                            parse_mode="Markdown"
+                        )
+                        wol_cfg = self.config.get("wol", {})
+                        pc_ip = wol_cfg.get("pc_ip", "")
+                        if pc_ip and wol_cfg.get("monitor_startup", True):
+                            from src.utils.wol_notifier import WoLNotifier
+                            notifier = WoLNotifier(bot=self, config=self.config)
+                            notifier.monitor_pc_startup(pc_ip, self.allowed_users)
+                    else:
+                        await query.message.reply_text("❌ فشل الإرسال. تأكد من الواي فاي.")
 
-        elif data == "wol_start":
-            result_text, _ = execute_command("wol_start", [], self.config, user_id=query.from_user.id, bot=self)
-            await query.message.reply_text(result_text, parse_mode="Markdown")
-            wol_cfg = self.config.get("wol", {})
-            if wol_cfg.get("auto_notify_backup", True) and wol_cfg.get("backup_users"):
-                from src.utils.wol_notifier import WoLNotifier
-                notifier = WoLNotifier(bot=self, config=self.config)
-                notifier.notify_async(query.from_user.id)
+            elif data == "wol_start":
+                result_text, _ = execute_command("wol_start", [], self.config, user_id=query.from_user.id, bot=self)
+                await query.message.reply_text(result_text, parse_mode="Markdown")
+                wol_cfg = self.config.get("wol", {})
+                if wol_cfg.get("auto_notify_backup", True) and wol_cfg.get("backup_users"):
+                    from src.utils.wol_notifier import WoLNotifier
+                    notifier = WoLNotifier(bot=self, config=self.config)
+                    notifier.notify_async(query.from_user.id)
+
+        except Exception as e:
+            logger.error(f"Callback handler error for data='{data}': {e}")
+            try:
+                await query.message.reply_text(f"❌ حدث خطأ: {e}")
+            except Exception:
+                pass
 
     async def send_notification(self, message: str):
         if not self.app or not self.allowed_users:

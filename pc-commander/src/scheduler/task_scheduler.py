@@ -32,7 +32,14 @@ class TaskScheduler:
         general = self.config.get("general", {})
         if general.get("daily_report_enabled", True):
             report_time = general.get("daily_report_time", "08:00")
-            hour, minute = map(int, report_time.split(":"))
+            try:
+                parts = report_time.split(":")
+                hour, minute = int(parts[0]), int(parts[1])
+            except (ValueError, IndexError, AttributeError):
+                logger.warning(
+                    f"Invalid daily_report_time '{report_time}', defaulting to 08:00"
+                )
+                hour, minute = 8, 0
             self.scheduler.add_job(
                 self._send_daily_report,
                 CronTrigger(hour=hour, minute=minute),
