@@ -32,6 +32,9 @@ security_state.json
 logs/
 commands.log
 
+# Pip accidental log files (e.g. "=20.7" from malformed pip install args)
+=[0-9]*
+
 # Temp
 *.tmp
 bore_out.txt
