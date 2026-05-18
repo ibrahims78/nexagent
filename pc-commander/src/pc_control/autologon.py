@@ -1,6 +1,7 @@
 import sys
 import subprocess
 import os
+import hashlib
 import urllib.request
 from pathlib import Path
 from src.utils.logger import get_logger
@@ -10,6 +11,16 @@ IS_WINDOWS = sys.platform == "win32"
 
 AUTOLOGON_URL = "https://live.sysinternals.com/Autologon.exe"
 AUTOLOGON_PATH = Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "PCCommander" / "Autologon.exe"
+
+AUTOLOGON_SHA256 = "KNOWN_HASH_HERE"
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def download_autologon() -> bool:
@@ -22,6 +33,12 @@ def download_autologon() -> bool:
                 logger.error(f"Autologon.exe size unexpected: {file_size} bytes — possible download error")
                 AUTOLOGON_PATH.unlink(missing_ok=True)
                 return False
+            if AUTOLOGON_SHA256 != "KNOWN_HASH_HERE":
+                actual = _sha256_file(AUTOLOGON_PATH)
+                if actual != AUTOLOGON_SHA256:
+                    logger.error(f"Autologon.exe integrity check failed: {actual}")
+                    AUTOLOGON_PATH.unlink(missing_ok=True)
+                    return False
         return AUTOLOGON_PATH.exists()
     except Exception as e:
         logger.error(f"Failed to download Autologon: {e}")

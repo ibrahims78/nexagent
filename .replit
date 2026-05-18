@@ -21,9 +21,9 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd pc-commander && python main.py"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd pc-commander && python -c \"from src.utils.config import load_config; c=load_config(); print('Config loaded OK'); print('Bot token set:', bool(c['telegram']['bot_token'])); print('AI provider:', c['ai']['provider'])\""

@@ -58,8 +58,23 @@ BLOCKED_CMD_PATTERNS = [
     r'\bregsvr32\b',
     r'\bcertutil\b.*-decode',
     r'\bbitsadmin\b',
+    r'\bnet\s+user\b',
+    r'\bnet\s+localgroup\b',
+    r'\bicacls\b',
+    r'\battrib\b.*\+h',
+    r'\bschtasks\b',
+    r'\bwmic\b',
+    r'\bvssadmin\b',
 ]
 _BLOCKED_RE = _re.compile('|'.join(BLOCKED_CMD_PATTERNS), _re.IGNORECASE)
+
+
+def configure_safe_apps(config: dict) -> None:
+    extra = config.get("general", {}).get("extra_allowed_apps", [])
+    for app in extra:
+        app = app.strip().lower()
+        if app:
+            SAFE_APPS.add(app)
 
 
 def open_application(app_name: str) -> str:

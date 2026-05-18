@@ -40,7 +40,8 @@ DEFAULT_CONFIG = {
         "start_with_windows": False,
         "do_not_disturb": False,
         "daily_report_time": "08:00",
-        "daily_report_enabled": True
+        "daily_report_enabled": True,
+        "extra_allowed_apps": []
     },
     "monitoring": {
         "cpu_alert_threshold": 90,

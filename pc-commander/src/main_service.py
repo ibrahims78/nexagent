@@ -1,6 +1,7 @@
 import json
 import secrets
 from src.utils.logger import get_logger
+from src.utils.config import encrypt_value, decrypt_value
 
 logger = get_logger()
 
@@ -48,14 +49,15 @@ class PCCommanderService:
         if token_file.exists():
             try:
                 with open(token_file) as f:
-                    self._http_token = json.load(f).get("token", "")
+                    raw = json.load(f).get("token", "")
+                self._http_token = decrypt_value(raw) if raw else ""
             except Exception:
                 self._http_token = ""
 
         if not self._http_token:
             self._http_token = secrets.token_urlsafe(32)
             with open(token_file, "w") as f:
-                json.dump({"token": self._http_token}, f)
+                json.dump({"token": encrypt_value(self._http_token)}, f)
 
         set_secret_token(self._http_token)
         self.server_thread = start_server(port=5000)

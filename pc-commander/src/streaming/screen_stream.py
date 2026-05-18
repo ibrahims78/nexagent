@@ -108,7 +108,9 @@ HTML_LOGIN = """<!DOCTYPE html>
 
 
 def _hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    return hashlib.pbkdf2_hmac(
+        'sha256', password.encode(), b'nexagent-stream-v1', 200_000
+    ).hex()
 
 
 def _capture_frame(quality: int = 60, scale: float = 1.0) -> bytes:
