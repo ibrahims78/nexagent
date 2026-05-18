@@ -27,6 +27,13 @@ echo [0/7] Running as Administrator... OK
 :: ─────────────────────────────────────────
 set "CONFIG=%~dp0sshremote_config.ini"
 if not exist "%CONFIG%" (
+    if exist "%~dp0sshremote_config.ini.template" (
+        copy /y "%~dp0sshremote_config.ini.template" "%CONFIG%" >nul
+        echo [0/7] Created sshremote_config.ini from template.
+        echo [0/7] IMPORTANT: Edit sshremote_config.ini and fill in your bot_token and chat_id before continuing.
+        pause
+        exit /b 1
+    )
     echo [ERROR] sshremote_config.ini not found next to this script.
     pause
     exit /b 1

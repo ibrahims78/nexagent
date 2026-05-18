@@ -47,14 +47,24 @@
   Step 1: Pre-setup
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  1. Open: sshremote_config.ini  (with Notepad)
-  2. Fill in:
+  Note: sshremote_config.ini is NOT included in the repository to
+  prevent credentials from being committed to git. A template file
+  (sshremote_config.ini.template) is provided instead.
+
+  If sshremote_config.ini does not exist, setup_v2.bat will create
+  it automatically from the template on first run, then pause and
+  ask you to fill in your credentials before continuing.
+
+  To configure manually:
+  1. Copy sshremote_config.ini.template → sshremote_config.ini
+  2. Open: sshremote_config.ini  (with Notepad)
+  3. Fill in:
 
      bot_token = your bot token here
      chat_id   = your Chat ID here
 
-  3. Save the file.
-  4. (Optional) Change install_path — default: C:\SshRemote_V2
+  4. Save the file.
+  5. (Optional) Change install_path — default: C:\SshRemote_V2
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Step 2: Installation
