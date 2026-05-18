@@ -1,6 +1,7 @@
 modules = ["python-3.12"]
 [agent]
 expertMode = true
+stack = "BEST_EFFORT_FALLBACK"
 
 [nix]
 channel = "stable-25_05"
@@ -26,4 +27,4 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd pc-commander && python -c \"from src.utils.config import load_config; c=load_config(); print('Config loaded OK'); print('Bot token set:', bool(c['telegram']['bot_token'])); print('AI provider:', c['ai']['provider'])\""
+args = "cd pc-commander && python run_headless.py"

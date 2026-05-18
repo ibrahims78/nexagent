@@ -1,10 +1,17 @@
 import json
 import os
 import stat
+import sys
 from pathlib import Path
 from cryptography.fernet import Fernet
 
-CONFIG_DIR = Path(os.environ.get("APPDATA", ".")) / "PCCommander"
+def _get_config_dir_path() -> Path:
+    """Return platform-appropriate config directory."""
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", ".")) / "PCCommander"
+    return Path(os.environ.get("NEXAGENT_CONFIG_DIR", str(Path.home() / ".nexagent")))
+
+CONFIG_DIR = _get_config_dir_path()
 CONFIG_FILE = CONFIG_DIR / "config.json"
 KEY_FILE = CONFIG_DIR / "secret.key"
 
