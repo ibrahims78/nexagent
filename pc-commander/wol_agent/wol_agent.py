@@ -25,7 +25,7 @@ DEFAULT_CONFIG = {
     "pc_mac": "",
     "pc_broadcast": "255.255.255.255",
     "pc_ip": "",
-    "agent_name": "وكيل المنزل"
+    "agent_name": "Home Agent"
 }
 
 
@@ -57,7 +57,7 @@ def send_magic_packet(mac: str, broadcast: str = "255.255.255.255") -> bool:
             s.sendto(magic, (broadcast, 7))
         return True
     except Exception as e:
-        print(f"خطأ WoL: {e}")
+        print(f"WoL error: {e}")
         return False
 
 
@@ -180,11 +180,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     if not config["bot_token"]:
-        print("❌ يرجى ضبط bot_token في wol_config.json أولاً")
-        print("راجع ملف SETUP_ANDROID_AR.txt")
+        print("ERROR: Please set bot_token in wol_config.json first")
+        print("See SETUP_ANDROID_AR.txt for setup instructions")
         return
 
-    print(f"✅ {config['agent_name']} يعمل...")
+    print(f"Agent '{config['agent_name']}' is running...")
     app = Application.builder().token(config["bot_token"]).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_callback))
