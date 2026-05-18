@@ -12,6 +12,7 @@ IS_WINDOWS = sys.platform == "win32"
 AUTOLOGON_URL = "https://live.sysinternals.com/Autologon.exe"
 AUTOLOGON_PATH = Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "PCCommander" / "Autologon.exe"
 
+# Pin a known hash by replacing "KNOWN_HASH_HERE" with the value logged on first successful download.
 AUTOLOGON_SHA256 = "KNOWN_HASH_HERE"
 
 
@@ -30,15 +31,15 @@ def download_autologon() -> bool:
         if AUTOLOGON_PATH.exists():
             file_size = AUTOLOGON_PATH.stat().st_size
             if file_size < 100_000 or file_size > 2_000_000:
-                logger.error(f"Autologon.exe size unexpected: {file_size} bytes — possible download error")
+                logger.error(f"Autologon.exe unexpected size: {file_size} bytes")
                 AUTOLOGON_PATH.unlink(missing_ok=True)
                 return False
-            if AUTOLOGON_SHA256 != "KNOWN_HASH_HERE":
-                actual = _sha256_file(AUTOLOGON_PATH)
-                if actual != AUTOLOGON_SHA256:
-                    logger.error(f"Autologon.exe integrity check failed: {actual}")
-                    AUTOLOGON_PATH.unlink(missing_ok=True)
-                    return False
+            actual_hash = _sha256_file(AUTOLOGON_PATH)
+            logger.info(f"Autologon.exe SHA256: {actual_hash}")
+            if AUTOLOGON_SHA256 != "KNOWN_HASH_HERE" and actual_hash != AUTOLOGON_SHA256:
+                logger.error(f"Autologon.exe integrity check FAILED: {actual_hash}")
+                AUTOLOGON_PATH.unlink(missing_ok=True)
+                return False
         return AUTOLOGON_PATH.exists()
     except Exception as e:
         logger.error(f"Failed to download Autologon: {e}")

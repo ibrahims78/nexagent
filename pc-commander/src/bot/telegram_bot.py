@@ -10,7 +10,7 @@ from telegram.ext import (
 )
 from src.utils.logger import get_logger, log_command
 from src.bot.commands import execute_command
-from src.utils.security_auth import (
+from src.security.auth import (
     check_authorization, request_pin_auth, verify_pin,
     is_waiting_pin, refresh_session
 )
@@ -33,6 +33,12 @@ class PCCommanderBot:
     def __init__(self, token: str, allowed_users: list, ai_handler, config: dict):
         self.token = token
         self.allowed_users = [int(u) for u in allowed_users if str(u).strip()]
+        if not self.allowed_users:
+            get_logger().warning(
+                "CONFIGURATION WARNING: allowed_users is empty — "
+                "the bot will reject ALL incoming messages. "
+                "Set telegram.allowed_users in nexagent_config.ini."
+            )
         self.ai_handler = ai_handler
         self.config = config
         self.app = None

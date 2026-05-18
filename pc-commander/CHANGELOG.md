@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.2] - 2026-05-18
+
+### Security
+- Remove nexagent_config.ini and sshremote_config.ini from git tracking (prevent accidental credential exposure)
+- Add Autologon.exe hash logging for future integrity pinning
+
+### Bug Fixes
+- Remove accidentally committed pip install log file (=20.7) from repository root
+- Fix thread leak in screen stream session cleanup (duplicate threads on stream restart)
+- Fix race condition in conversation_context cache (add threading.Lock)
+- Fix memory leak in HTTP server rate limiter (add periodic cleanup thread)
+- Fix expired PIN entries not being evicted proactively
+
+### Improvements
+- Add startup WARNING log when allowed_users is empty
+- Move security_auth.py to src/security/auth.py for cleaner module layout
+- CI: pre-install pyaudio via pipwin to prevent fragile wheel resolution
+- Config directory now cross-platform (Linux/macOS via NEXAGENT_CONFIG_DIR env var)
+
 ## [1.2.1] - 2026-05-17
 
 ### Bug Fixes
