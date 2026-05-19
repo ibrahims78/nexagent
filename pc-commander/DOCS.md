@@ -1,7 +1,7 @@
 # NexAgent — Complete Documentation
 
-**Version:** 1.1.0  
-**Updated:** 2026
+**Version:** 1.3.0  
+**Updated:** 2026-05-19
 
 ---
 
@@ -456,7 +456,65 @@ python scripts/bump_version.py
 
 ---
 
-## 10. KNOWN LIMITATIONS
+## 10. CONNECTION METHODS / طرق الاتصال
+
+NexAgent v1.3 supports multiple simultaneous connection methods. The Connection Manager starts all available methods automatically at startup.
+
+| الطريقة | البروتوكول | يحتاج إنترنت | يحتاج راوتر | وصول للشبكة المنزلية | الإعداد |
+|---|---|:---:|:---:|:---:|:---|
+| Telegram Polling (افتراضي) | HTTPS/443 | ✅ | ❌ | ❌ | لا شيء |
+| Telegram Webhook | HTTPS/443 | ✅ | ❌ | ❌ | تفعيل من الإعدادات |
+| HTTP API — LAN (جديد) | HTTP | ❌ | ❌ | ✅ | toggle في الإعدادات |
+| HTTP API — Tailscale (جديد) | WireGuard/UDP | ✅ | ❌ | جزئي | تطبيق Tailscale |
+| HTTP API — Cloudflare | HTTPS/443 | ✅ | ❌ | ❌ | cloudflared |
+| HTTP API — ngrok | HTTPS/443 | ✅ | ❌ | ❌ | ngrok token |
+| SSH عبر bore | TCP/SSH | ✅ | ❌ | ❌ | setup_v2.bat |
+| VPN Server RRAS (جديد) | L2TP/IPsec | ✅ | ✅ (UDP 500/4500/1701) | ✅ كامل | `vpn_server_enable` |
+
+### Connection Examples
+
+```bash
+# Telegram (always works — no URL needed)
+أرسل أي رسالة للبوت على تيليغرام
+
+# HTTP API — LAN (fastest, no internet required)
+curl -H "Authorization: Bearer TOKEN" \
+     -d '{"command":"screenshot"}' \
+     http://192.168.1.105:5000/command
+
+# HTTP API — Tailscale (secure, from anywhere)
+curl -H "Authorization: Bearer TOKEN" \
+     -d '{"command":"system_status"}' \
+     http://100.94.32.17:5000/command
+
+# SSH — via bore tunnel
+ssh user@bore.pub -p 45231
+
+# SSH — direct via Tailscale IP
+ssh user@100.94.32.17
+
+# HTTP API — Cloudflare Tunnel (public URL)
+curl -H "Authorization: Bearer TOKEN" \
+     -d '{"command":"list_files"}' \
+     https://abc123.trycloudflare.com/command
+```
+
+### Telegram Commands for Connection Management
+
+| الأمر | الوظيفة |
+|---|---|
+| `network_info` | عرض كل IPs المتاحة وحالة كل اتصال |
+| `tailscale_status` | حالة Tailscale والـ IP الخاص به |
+| `vpn_server_enable` | تحويل الحاسب لـ VPN Server (L2TP/IPsec) |
+| `vpn_server_disable` | إيقاف VPN Server |
+| `vpn_server_status` | حالة VPN والاتصالات النشطة |
+| `vpn_client_list` | عرض اتصالات VPN المحفوظة |
+| `vpn_client_connect [name]` | الاتصال بـ VPN محفوظ |
+| `ssh_bore_port` | رقم منفذ SSH الحالي عبر bore |
+
+---
+
+## 11. KNOWN LIMITATIONS
 
 - **Windows only.** The bot relies on `pywin32`, `pystray`, `pycaw`, and Windows-specific APIs. It will not run on Linux or macOS.
 - **Voice transcription with Gemini** uses `speech_recognition` + Google Web Speech API (requires internet). For offline transcription, use OpenAI Whisper via the OpenAI provider.

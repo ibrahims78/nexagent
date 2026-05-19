@@ -37,9 +37,20 @@ DEFAULT_CONFIG = {
         "model_gemini": "gemini-1.5-flash"
     },
     "tunnel": {
-        "provider": "cloudflare",
+        "provider": "cloudflare",   # cloudflare | ngrok | tailscale
         "ngrok_token": "",
-        "cloudflare_tunnel_id": ""
+        "cloudflare_tunnel_id": "",
+        "use_webhook": False,       # True = faster webhook mode (requires tunnel URL)
+        "webhook_url": ""           # Auto-filled by tunnel handler on start
+    },
+    "server": {
+        "lan_access": False,        # True = bind to 0.0.0.0 (accessible from LAN)
+        "port": 5000
+    },
+    "vpn": {
+        "server_enabled": False,
+        "protocol": "L2tp",
+        "auto_disable_hours": 24
     },
     "general": {
         "language": "ar",

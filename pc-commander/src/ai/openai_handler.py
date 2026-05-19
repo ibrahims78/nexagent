@@ -46,6 +46,21 @@ SYSTEM_PROMPT_AR = """أنت مساعد ذكاء اصطناعي متخصص في 
 استخدم vision_do للأوامر التي تحتاج رؤية الشاشة مثل:
 "اضغط على..."، "انقر على..."، "أغلق النافذة"، "اكتب في الحقل"
 
+🌐 أوامر الشبكة والاتصال:
+- network_info: عرض IP المحلي واسم الجهاز وطرق الاتصال المتاحة
+- tailscale_status: حالة Tailscale VPN والـ IP الخاص به
+
+🔐 أوامر VPN (الشبكة الخاصة الافتراضية - ويندوز مدمج):
+- vpn_server_enable: تفعيل هذا الحاسب كـ VPN Server (يرسل بيانات الاتصال تلقائياً)
+- vpn_server_disable: إيقاف VPN Server وتنظيف الإعدادات
+- vpn_server_status: حالة VPN Server والاتصالات النشطة
+- vpn_client_list: عرض اتصالات VPN المحفوظة على هذا الحاسب
+- vpn_client_add [اسم] [server] [psk] [user]: إضافة اتصال VPN
+- vpn_client_connect [اسم]: الاتصال باتصال VPN محفوظ
+- vpn_client_disconnect [اسم]: قطع اتصال VPN
+
+استخدم vpn_server_enable عند قول: "شغّل VPN"، "افتح VPN"، "أريد أتصل بالشبكة"
+
 رد بتنسيق JSON فقط:
 {"command": "اسم_الأمر", "args": [], "response": "رسالة للمستخدم"}
 

@@ -403,6 +403,78 @@ def execute_command(
                 else:
                     result_text = "❌ لا يوجد منفذ نشط. تأكد من تشغيل النفق على الجهاز."
 
+        elif command == "tailscale_status":
+            from src.tunnel.tailscale_handler import TailscaleHandler
+            ts = TailscaleHandler(port=5000)
+            ip = ts.get_tailscale_ip()
+            if ip:
+                result_text = (
+                    f"🟢 **Tailscale نشط**\n\n"
+                    f"🌐 IP الخاص بك: `{ip}`\n"
+                    f"🔗 HTTP API: `http://{ip}:5000`\n"
+                    f"💻 SSH: `ssh {config.get('ssh', {}).get('username', 'USER')}@{ip}`\n\n"
+                    f"✅ يمكنك الاتصال من أي جهاز على نفس شبكة Tailscale"
+                )
+            else:
+                result_text = ts.get_install_instructions()
+
+        elif command == "network_info":
+            import socket
+            hostname = socket.gethostname()
+            try:
+                local_ip = socket.gethostbyname(hostname)
+            except Exception:
+                local_ip = "غير متاح"
+            lan_on = config.get("server", {}).get("lan_access", False)
+            result_text = (
+                f"🌐 **معلومات الشبكة:**\n\n"
+                f"💻 اسم الجهاز: `{hostname}`\n"
+                f"🏠 IP المحلي: `{local_ip}`\n"
+                f"🔌 HTTP API (LAN): `{'http://' + local_ip + ':5000' if lan_on else 'معطّل — فعّله من الإعدادات'}`\n"
+                f"🔑 SSH (bore): جرّب أمر `ssh_bore_port`\n"
+                f"🛡️ Tailscale: جرّب أمر `tailscale_status`\n"
+                f"🔐 VPN Server: جرّب أمر `vpn_server_status`"
+            )
+
+        elif command == "vpn_server_enable":
+            from src.pc_control.vpn_manager import enable_vpn_server
+            result_text = enable_vpn_server()
+
+        elif command == "vpn_server_disable":
+            from src.pc_control.vpn_manager import disable_vpn_server
+            result_text = disable_vpn_server()
+
+        elif command == "vpn_server_status":
+            from src.pc_control.vpn_manager import get_vpn_status
+            result_text = get_vpn_status()
+
+        elif command == "vpn_client_add":
+            from src.pc_control.vpn_manager import add_vpn_client_profile
+            name     = args[0] if len(args) > 0 else "NexAgent-VPN"
+            server   = args[1] if len(args) > 1 else ""
+            psk      = args[2] if len(args) > 2 else ""
+            username = args[3] if len(args) > 3 else ""
+            if not server or not psk:
+                result_text = "⚠️ الاستخدام: vpn_client_add <name> <server> <psk> <user>"
+            else:
+                result_text = add_vpn_client_profile(name, server, psk, username)
+
+        elif command == "vpn_client_connect":
+            from src.pc_control.vpn_manager import connect_vpn_client
+            name = args[0] if args else ""
+            result_text = connect_vpn_client(name) if name \
+                else "⚠️ الاستخدام: vpn_client_connect <name>"
+
+        elif command == "vpn_client_disconnect":
+            from src.pc_control.vpn_manager import disconnect_vpn_client
+            name = args[0] if args else ""
+            result_text = disconnect_vpn_client(name) if name \
+                else "⚠️ الاستخدام: vpn_client_disconnect <name>"
+
+        elif command == "vpn_client_list":
+            from src.pc_control.vpn_manager import list_vpn_profiles
+            result_text = list_vpn_profiles()
+
         else:
             result_text = f"⚠️ أمر غير معروف: {command}"
 

@@ -79,9 +79,12 @@ def execute_command():
     return jsonify({"error": "No handler"}), 500
 
 
-def start_server(port: int = 5000):
+def start_server(port: int = 5000, lan_access: bool = False):
     import werkzeug.serving
-    server = werkzeug.serving.make_server("127.0.0.1", port, app, threaded=True)
+    host = "0.0.0.0" if lan_access else "127.0.0.1"
+    server = werkzeug.serving.make_server(host, port, app, threaded=True)
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
+    access_note = f"LAN access ON ({host}:{port})" if lan_access else f"localhost only ({host}:{port})"
+    logger.info(f"HTTP server started — {access_note}")
     return t

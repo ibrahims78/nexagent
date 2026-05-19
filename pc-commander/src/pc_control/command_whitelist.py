@@ -57,6 +57,15 @@ COMMAND_REGISTRY: dict = {
     "sftp_get":          {"min_args": 1, "max_args": 1},
     "sftp_put":          {"min_args": 2, "max_args": 2},
     "ssh_bore_port":     {"min_args": 0, "max_args": 0},
+    "tailscale_status":      {"min_args": 0, "max_args": 0},
+    "network_info":          {"min_args": 0, "max_args": 0},
+    "vpn_server_enable":     {"min_args": 0, "max_args": 0},
+    "vpn_server_disable":    {"min_args": 0, "max_args": 0},
+    "vpn_server_status":     {"min_args": 0, "max_args": 0},
+    "vpn_client_add":        {"min_args": 3, "max_args": 4},
+    "vpn_client_connect":    {"min_args": 1, "max_args": 1},
+    "vpn_client_disconnect": {"min_args": 1, "max_args": 1},
+    "vpn_client_list":       {"min_args": 0, "max_args": 0},
 }
 
 

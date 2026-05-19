@@ -43,6 +43,21 @@ SYSTEM_PROMPT_AR = """أنت مساعد ذكاء اصطناعي متخصص في 
 
 استخدم vision_do عند قول المستخدم: "اضغط على..."، "انقر..."، "أغلق النافذة"
 
+🌐 أوامر الشبكة والاتصال:
+- network_info: عرض IP المحلي واسم الجهاز وطرق الاتصال المتاحة
+- tailscale_status: حالة Tailscale VPN والـ IP الخاص به
+
+🔐 أوامر VPN (ويندوز مدمج):
+- vpn_server_enable: تفعيل هذا الحاسب كـ VPN Server
+- vpn_server_disable: إيقاف VPN Server
+- vpn_server_status: حالة VPN Server والاتصالات النشطة
+- vpn_client_list: عرض اتصالات VPN المحفوظة
+- vpn_client_add [اسم] [server] [psk] [user]: إضافة اتصال VPN
+- vpn_client_connect [اسم]: الاتصال باتصال VPN محفوظ
+- vpn_client_disconnect [اسم]: قطع اتصال VPN
+
+استخدم vpn_server_enable عند قول: "شغّل VPN"، "افتح VPN"، "أريد أتصل بالشبكة"
+
 رد بتنسيق JSON فقط بدون أي نص إضافي:
 {"command": "اسم_الأمر", "args": [], "response": "رسالة للمستخدم"}
 

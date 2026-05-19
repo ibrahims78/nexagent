@@ -9,7 +9,7 @@ from src.utils.security_auth import validate_telegram_token
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.3.0"
 APP_NAME = "NexAgent"
 
 
@@ -204,14 +204,17 @@ class SettingsWindow(ctk.CTk):
         provider_frame = ctk.CTkFrame(tab)
         provider_frame.pack(fill="x", padx=20, pady=5)
 
-        ctk.CTkLabel(provider_frame, text="طريقة الاتصال:").pack(side="left", padx=15, pady=10)
+        ctk.CTkLabel(provider_frame, text="النفق الرئيسي:").pack(side="left", padx=15, pady=10)
         self.tunnel_provider_var = ctk.StringVar(value="cloudflare")
-        ctk.CTkRadioButton(provider_frame, text="Cloudflare Tunnel (مجاني)",
+        ctk.CTkRadioButton(provider_frame, text="Cloudflare (مجاني)",
                            variable=self.tunnel_provider_var, value="cloudflare",
-                           command=self._on_tunnel_change).pack(side="left", padx=10, pady=10)
+                           command=self._on_tunnel_change).pack(side="left", padx=8, pady=10)
         ctk.CTkRadioButton(provider_frame, text="ngrok",
                            variable=self.tunnel_provider_var, value="ngrok",
-                           command=self._on_tunnel_change).pack(side="left", padx=10, pady=10)
+                           command=self._on_tunnel_change).pack(side="left", padx=8, pady=10)
+        ctk.CTkRadioButton(provider_frame, text="Tailscale",
+                           variable=self.tunnel_provider_var, value="tailscale",
+                           command=self._on_tunnel_change).pack(side="left", padx=8, pady=10)
 
         self.cloudflare_frame = ctk.CTkFrame(tab)
         self.cloudflare_frame.pack(fill="x", padx=20, pady=5)
@@ -236,6 +239,59 @@ class SettingsWindow(ctk.CTk):
             text="💡 احصل على Token من: dashboard.ngrok.com",
             font=ctk.CTkFont(size=11), text_color="#888"
         ).grid(row=1, column=0, columnspan=3, padx=10, pady=2)
+
+        lan_frame = ctk.CTkFrame(tab)
+        lan_frame.pack(fill="x", padx=20, pady=5)
+        lan_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            lan_frame, text="🏠  الوصول من الشبكة المحلية (LAN)",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 2), sticky="w")
+
+        ctk.CTkLabel(
+            lan_frame,
+            text="يسمح للأجهزة في نفس الشبكة بالوصول لـ HTTP API مباشرة بدون إنترنت",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 6), sticky="w")
+
+        self.lan_access_var = ctk.BooleanVar(value=False)
+        ctk.CTkSwitch(
+            lan_frame,
+            text="السماح بالوصول من الشبكة المحلية",
+            variable=self.lan_access_var,
+            font=ctk.CTkFont(size=12)
+        ).grid(row=2, column=0, columnspan=2, padx=15, pady=(0, 10), sticky="w")
+
+        webhook_frame = ctk.CTkFrame(tab)
+        webhook_frame.pack(fill="x", padx=20, pady=5)
+        webhook_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            webhook_frame, text="⚡  وضع Webhook (أسرع من Polling)",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 2), sticky="w")
+
+        ctk.CTkLabel(
+            webhook_frame,
+            text="يحتاج URL ثابتاً من النفق — يُفعَّل تلقائياً عند توفر النفق",
+            font=ctk.CTkFont(size=11), text_color="#888"
+        ).grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 6), sticky="w")
+
+        self.use_webhook_var = ctk.BooleanVar(value=False)
+        ctk.CTkSwitch(
+            webhook_frame,
+            text="تفعيل وضع Webhook",
+            variable=self.use_webhook_var,
+            font=ctk.CTkFont(size=12)
+        ).grid(row=2, column=0, columnspan=2, padx=15, pady=(0, 6), sticky="w")
+
+        ctk.CTkLabel(webhook_frame, text="Webhook URL:", width=120, anchor="w").grid(row=3, column=0, padx=10, pady=6)
+        self.webhook_url_var = ctk.StringVar()
+        ctk.CTkEntry(
+            webhook_frame, textvariable=self.webhook_url_var,
+            placeholder_text="https://abc123.trycloudflare.com (يُملأ تلقائياً)"
+        ).grid(row=3, column=1, padx=10, pady=6, sticky="ew")
 
         anydesk_frame = ctk.CTkFrame(tab)
         anydesk_frame.pack(fill="x", padx=20, pady=10)
@@ -784,6 +840,9 @@ class SettingsWindow(ctk.CTk):
         self.gemini_model_var.set(cfg["ai"].get("model_gemini", "gemini-pro"))
         self.tunnel_provider_var.set(cfg["tunnel"].get("provider", "cloudflare"))
         self.ngrok_token_var.set(cfg["tunnel"].get("ngrok_token", ""))
+        self.lan_access_var.set(cfg.get("server", {}).get("lan_access", False))
+        self.use_webhook_var.set(cfg["tunnel"].get("use_webhook", False))
+        self.webhook_url_var.set(cfg["tunnel"].get("webhook_url", ""))
         self.anydesk_path_var.set(cfg["anydesk"].get("path", ""))
         wol = cfg.get("wol", {})
         self.wol_mac_var.set(wol.get("mac_address", ""))
@@ -822,6 +881,11 @@ class SettingsWindow(ctk.CTk):
         self.config["ai"]["model_gemini"] = self.gemini_model_var.get()
         self.config["tunnel"]["provider"] = self.tunnel_provider_var.get()
         self.config["tunnel"]["ngrok_token"] = self.ngrok_token_var.get().strip()
+        self.config["tunnel"]["use_webhook"] = self.use_webhook_var.get()
+        self.config["tunnel"]["webhook_url"] = self.webhook_url_var.get().strip()
+        if "server" not in self.config:
+            self.config["server"] = {}
+        self.config["server"]["lan_access"] = self.lan_access_var.get()
         self.config["anydesk"]["path"] = self.anydesk_path_var.get().strip()
         wol_backup_raw = self.wol_backup_users_var.get().strip()
         wol_backup = [u.strip() for u in wol_backup_raw.split(",") if u.strip().isdigit()]

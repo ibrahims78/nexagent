@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.3.0] - 2026-05-19
+
+### Features — Connection Manager & VPN
+
+#### Tailscale VPN Support
+- Add `src/tunnel/tailscale_handler.py` — auto-detects Tailscale at startup (2s timeout, non-blocking)
+- `tailscale_status` command — shows 100.x.x.x IP and HTTP/SSH access links
+- Tailscale added as a third `provider` option in config alongside cloudflare/ngrok
+
+#### LAN Access Mode
+- HTTP server now supports `0.0.0.0` binding via `server.lan_access` config flag
+- Add `network_info` command — shows local IP, LAN status, and all available connection methods
+- LAN toggle added to settings GUI (الاتصال tab)
+
+#### Telegram Webhook Mode
+- `_async_run()` now supports webhook mode when `tunnel.use_webhook = True`
+- Auto-fills `tunnel.webhook_url` from active tunnel URL on startup
+- Falls back to polling automatically if webhook URL is missing
+- Webhook toggle + URL field added to settings GUI
+
+#### Connection Manager (Auto + Multi)
+- Replace `_start_tunnel()` with `_start_all_connections()` — starts ALL available connections simultaneously
+- Tailscale always auto-detected; LAN controlled by toggle; tunnel provider configurable
+- Tailscale stopped independently on shutdown (no double-stop if it's also the primary provider)
+
+#### Windows Built-in VPN Server (RRAS)
+- Add `src/pc_control/vpn_manager.py` — full Windows RRAS VPN server/client management
+- `vpn_server_enable` — turns PC into L2TP/IPsec VPN server; auto-generates PSK + credentials; opens firewall rules; sends connection details via Telegram
+- `vpn_server_disable` — stops RRAS, removes VPN user, closes firewall rules
+- `vpn_server_status` — shows RRAS status, public IP, and active connections
+- `vpn_client_add` / `vpn_client_connect` / `vpn_client_disconnect` / `vpn_client_list` — manage client-side VPN profiles
+- Checks Windows edition (Home not supported), gracefully returns instructions
+- `winreg` import moved inside functions (fixes `ModuleNotFoundError` on Linux/Replit)
+- Password intentionally omitted from `vpn_client_add` (security: set locally via Windows settings)
+
+### Config
+- Add `tunnel.use_webhook` and `tunnel.webhook_url` to `DEFAULT_CONFIG`
+- Add `server` section (`lan_access`, `port`) to `DEFAULT_CONFIG`
+- Add `vpn` section (`server_enabled`, `protocol`, `auto_disable_hours`) to `DEFAULT_CONFIG`
+
+### AI Prompts
+- Add VPN commands (`vpn_server_enable`, `vpn_server_disable`, `vpn_server_status`, `vpn_client_*`) to both OpenAI and Gemini system prompts
+- Add `network_info` and `tailscale_status` to both prompts
+
+### Tests
+- Add `tests/test_vpn_manager.py` with 5 unit tests (skipped automatically on non-Windows)
+
+### GUI
+- `settings_window.py` version bumped to 1.3.0
+- Tailscale added as radio button option in الاتصال tab
+- LAN access CTkSwitch added to الاتصال tab
+- Webhook CTkSwitch + URL field added to الاتصال tab
+
+---
+
 ## [1.2.2] - 2026-05-18
 
 ### Security

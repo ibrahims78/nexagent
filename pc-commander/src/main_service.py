@@ -11,6 +11,7 @@ class PCCommanderService:
         self.config = None
         self.bot = None
         self.tunnel = None
+        self._tailscale = None
         self.scheduler = None
         self.network_monitor = None
         self.server_thread = None
@@ -27,7 +28,7 @@ class PCCommanderService:
 
         try:
             self._start_server()
-            self._start_tunnel()
+            self._start_all_connections()
             self._start_ai()
             self._wire_vision_handler()
             self._wire_ssh_executor()
@@ -60,26 +61,57 @@ class PCCommanderService:
                 json.dump({"token": encrypt_value(self._http_token)}, f)
 
         set_secret_token(self._http_token)
-        self.server_thread = start_server(port=5000)
-        logger.info("Local HTTP server on port 5000 (token persisted to http_token.json)")
+        lan_access = self.config.get("server", {}).get("lan_access", False)
+        self.server_thread = start_server(port=5000, lan_access=lan_access)
+        if lan_access:
+            import socket
+            try:
+                local_ip = socket.gethostbyname(socket.gethostname())
+                logger.info(f"LAN access enabled — reachable at http://{local_ip}:5000")
+            except Exception:
+                pass
 
-    def _start_tunnel(self):
-        provider = self.config["tunnel"].get("provider", "cloudflare")
+    def _start_all_connections(self):
+        """Start all enabled connection methods in parallel."""
+        tunnel_cfg = self.config.get("tunnel", {})
+        provider = tunnel_cfg.get("provider", "cloudflare")
+
+        # 1. Auto-detect Tailscale (always, non-blocking, 2s timeout)
+        try:
+            from src.tunnel.tailscale_handler import TailscaleHandler
+            ts = TailscaleHandler(port=5000)
+            ts_url = ts.start()
+            if ts_url:
+                self._tailscale = ts
+                logger.info(f"Tailscale VPN detected: {ts_url}")
+        except Exception as e:
+            logger.debug(f"Tailscale check skipped: {e}")
+
+        # 2. Primary tunnel provider
+        if provider == "tailscale":
+            self.tunnel = self._tailscale
+            if not self.tunnel:
+                logger.warning("Tailscale selected as provider but not available")
+            return
+
         if provider == "cloudflare":
             from src.tunnel.cloudflare_handler import CloudflareHandler
             self.tunnel = CloudflareHandler(port=5000)
         else:
             from src.tunnel.ngrok_handler import NgrokHandler
             self.tunnel = NgrokHandler(
-                auth_token=self.config["tunnel"].get("ngrok_token", ""),
+                auth_token=tunnel_cfg.get("ngrok_token", ""),
                 port=5000
             )
 
         url = self.tunnel.start()
         if url:
-            logger.info(f"Tunnel active: {url}")
+            logger.info(f"Tunnel active ({provider}): {url}")
+            # Auto-fill webhook_url for webhook mode if not already set
+            if not tunnel_cfg.get("webhook_url"):
+                self.config["tunnel"]["webhook_url"] = url
         else:
-            logger.warning("Tunnel failed to start - bot will run without tunnel")
+            logger.warning(f"Tunnel ({provider}) failed to start — bot will run without tunnel")
 
     def _start_ai(self):
         provider = self.config["ai"].get("provider", "openai")
@@ -219,6 +251,8 @@ class PCCommanderService:
             self.bot.stop()
         if self.tunnel:
             self.tunnel.stop()
+        if self._tailscale and self._tailscale is not self.tunnel:
+            self._tailscale.stop()
         if self._ssh_executor:
             self._ssh_executor.close()
         self._running = False

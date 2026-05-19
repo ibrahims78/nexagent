@@ -421,8 +421,20 @@ class PCCommanderBot:
 
         self._start_context_cleanup()
 
-        logger.info("NexAgent bot is running...")
-        await self.app.run_polling(drop_pending_updates=True)
+        webhook_url = self.config.get("tunnel", {}).get("webhook_url", "")
+        use_webhook = bool(webhook_url) and self.config.get("tunnel", {}).get("use_webhook", False)
+
+        if use_webhook:
+            logger.info(f"Starting in WEBHOOK mode: {webhook_url}/webhook")
+            await self.app.run_webhook(
+                listen="127.0.0.1",
+                port=8443,
+                webhook_url=f"{webhook_url}/webhook",
+                drop_pending_updates=True,
+            )
+        else:
+            logger.info("Starting in POLLING mode")
+            await self.app.run_polling(drop_pending_updates=True)
 
     def stop(self):
         self._running = False
