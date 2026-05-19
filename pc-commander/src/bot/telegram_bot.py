@@ -426,12 +426,34 @@ class PCCommanderBot:
 
         if use_webhook:
             logger.info(f"Starting in WEBHOOK mode: {webhook_url}/webhook")
-            await self.app.run_webhook(
-                listen="127.0.0.1",
-                port=8443,
-                webhook_url=f"{webhook_url}/webhook",
+            from telegram import Update
+            from src.server.http_server import register_telegram_webhook
+
+            await self.app.initialize()
+            await self.app.bot.set_webhook(
+                url=f"{webhook_url}/webhook",
                 drop_pending_updates=True,
             )
+            await self.app.start()
+
+            def _on_webhook_update(data: dict):
+                """Called by Flask on every POST /webhook — thread-safe."""
+                update = Update.de_json(data, self.app.bot)
+                if self._loop and not self._loop.is_closed():
+                    import asyncio
+                    asyncio.run_coroutine_threadsafe(
+                        self.app.process_update(update), self._loop
+                    )
+
+            register_telegram_webhook(_on_webhook_update)
+            logger.info("Webhook registered — waiting for updates via Flask /webhook")
+
+            while self._running:
+                await asyncio.sleep(1)
+
+            await self.app.bot.delete_webhook()
+            await self.app.stop()
+            await self.app.shutdown()
         else:
             logger.info("Starting in POLLING mode")
             await self.app.run_polling(drop_pending_updates=True)

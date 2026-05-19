@@ -115,13 +115,13 @@ def get_rras_status() -> str:
 
 def enable_rras() -> tuple:
     """Enable and start the RRAS (RemoteAccess) service."""
+    if get_rras_status() == "running":
+        return True, "RRAS already running"
     _run(["sc", "config", "RemoteAccess", "start=", "auto"])
     rc2, _, _ = _run(["net", "start", "RemoteAccess"])
     time.sleep(3)
     if get_rras_status() == "running":
         return True, "RRAS started successfully"
-    if get_rras_status() == "running":
-        return True, "RRAS already running"
     return False, f"Failed to start RRAS (rc={rc2})"
 
 

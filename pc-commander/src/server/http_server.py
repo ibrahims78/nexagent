@@ -2,13 +2,16 @@ import time
 import threading
 from flask import Flask, request, jsonify
 import logging
+from src.utils.logger import get_logger
 
 log = logging.getLogger("werkzeug")
 log.setLevel(logging.ERROR)
 
+logger = get_logger()
 app = Flask(__name__)
 _command_handler = None
 _secret_token = None
+_telegram_webhook_callback = None
 _rate_limits: dict = {}
 _rate_lock = threading.Lock()
 
@@ -42,6 +45,12 @@ def set_secret_token(token: str):
     _secret_token = token
 
 
+def register_telegram_webhook(callback):
+    """Register a callback that receives raw Telegram update dicts from /webhook."""
+    global _telegram_webhook_callback
+    _telegram_webhook_callback = callback
+
+
 def _is_rate_limited(client_ip: str) -> bool:
     with _rate_lock:
         now = time.time()
@@ -56,6 +65,20 @@ def _is_rate_limited(client_ip: str) -> bool:
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "app": "NexAgent"})
+
+
+@app.route("/webhook", methods=["POST"])
+def telegram_webhook():
+    """Receive Telegram webhook updates and forward to the registered bot callback."""
+    if _telegram_webhook_callback is None:
+        return jsonify({"error": "Webhook not registered"}), 503
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        _telegram_webhook_callback(data)
+    except Exception as e:
+        logger.error(f"Webhook callback error: {e}")
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True})
 
 
 @app.route("/command", methods=["POST"])

@@ -91,12 +91,16 @@ def test_default_config_complete():
 
     required_sections = [
         "telegram", "ai", "tunnel", "general",
-        "monitoring", "anydesk", "wol", "security", "stream"
+        "monitoring", "anydesk", "wol", "security", "stream",
+        "server", "vpn",
     ]
     for section in required_sections:
         assert section in DEFAULT_CONFIG, f"Missing section: {section}"
 
     assert DEFAULT_CONFIG["ai"]["model_gemini"] == "gemini-1.5-flash"
+    assert "lan_access" in DEFAULT_CONFIG["server"], "server.lan_access missing"
+    assert "use_webhook" in DEFAULT_CONFIG["tunnel"], "tunnel.use_webhook missing"
+    assert "webhook_url" in DEFAULT_CONFIG["tunnel"], "tunnel.webhook_url missing"
 
 
 def test_load_config_returns_defaults_when_no_file(isolated_config):

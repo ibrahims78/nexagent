@@ -166,12 +166,14 @@ def load_config() -> dict:
     """Load config from disk, decrypting sensitive fields if needed."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     if not CONFIG_FILE.exists():
+        import copy
         save_config(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG.copy()
+        return copy.deepcopy(DEFAULT_CONFIG)
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        merged = DEFAULT_CONFIG.copy()
+        import copy
+        merged = copy.deepcopy(DEFAULT_CONFIG)
         deep_merge(merged, data)
 
         if data.get("_encrypted") is True:
