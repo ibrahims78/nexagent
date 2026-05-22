@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google")
 import google.generativeai as genai
 import json
 import re
