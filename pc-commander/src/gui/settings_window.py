@@ -71,31 +71,55 @@ class SettingsWindow(ctk.CTk):
         self._build_monitoring_tab()
         self._build_logs_tab()
 
-        btn_frame = ctk.CTkFrame(self, height=60, corner_radius=0, fg_color="#0d0d1a")
+        btn_frame = ctk.CTkFrame(self, height=70, corner_radius=0, fg_color="#0a0a1a")
         btn_frame.grid(row=2, column=0, sticky="ew")
         btn_frame.grid_propagate(False)
+        btn_frame.grid_columnconfigure(2, weight=1)
 
         self.start_btn = ctk.CTkButton(
-            btn_frame, text="▶  تشغيل", width=140, height=38,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#2e7d32", hover_color="#1b5e20",
-            command=self._toggle_service
+            btn_frame, text="▶  تشغيل", width=150, height=44,
+            font=ctk.CTkFont(size=15, weight="bold"),
+            fg_color="#1b5e20", hover_color="#2e7d32",
+            border_width=1, border_color="#4caf50",
+            corner_radius=8,
+            command=self._start_service
         )
-        self.start_btn.pack(side="left", padx=20, pady=10)
+        self.start_btn.grid(row=0, column=0, padx=(20, 6), pady=13)
+
+        self.stop_btn = ctk.CTkButton(
+            btn_frame, text="⏹  إيقاف", width=150, height=44,
+            font=ctk.CTkFont(size=15, weight="bold"),
+            fg_color="#4a0000", hover_color="#c62828",
+            border_width=1, border_color="#ef5350",
+            corner_radius=8,
+            state="disabled",
+            command=self._stop_service
+        )
+        self.stop_btn.grid(row=0, column=1, padx=(0, 6), pady=13)
+
+        self.bot_status_indicator = ctk.CTkLabel(
+            btn_frame,
+            text="⚫  البوت متوقف",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#666666"
+        )
+        self.bot_status_indicator.grid(row=0, column=2, padx=10)
 
         ctk.CTkButton(
-            btn_frame, text="💾  حفظ الإعدادات", width=160, height=38,
+            btn_frame, text="💾  حفظ", width=110, height=44,
             font=ctk.CTkFont(size=13),
             fg_color="#1565c0", hover_color="#0d47a1",
+            corner_radius=8,
             command=self._save_settings
-        ).pack(side="left", padx=5, pady=10)
+        ).grid(row=0, column=3, padx=6, pady=13)
 
         ctk.CTkButton(
-            btn_frame, text="🗕  تصغير", width=100, height=38,
+            btn_frame, text="🗕  تصغير", width=95, height=44,
             font=ctk.CTkFont(size=13),
-            fg_color="#424242", hover_color="#212121",
+            fg_color="#2d2d2d", hover_color="#424242",
+            corner_radius=8,
             command=self._minimize_to_tray
-        ).pack(side="right", padx=20, pady=10)
+        ).grid(row=0, column=4, padx=(0, 20), pady=13)
 
     def _build_telegram_tab(self):
         tab = self.tabview.tab("تيليغرام")
@@ -928,6 +952,8 @@ class SettingsWindow(ctk.CTk):
             self._stop_service()
 
     def _start_service(self):
+        if self.is_running:
+            return
         self._save_settings()
         if not self.config["telegram"].get("bot_token"):
             messagebox.showerror("خطأ", "يرجى إدخال Bot Token أولاً")
@@ -941,21 +967,42 @@ class SettingsWindow(ctk.CTk):
             messagebox.showerror("خطأ", "يرجى إدخال Gemini API Key")
             return
 
+        self.start_btn.configure(state="disabled")
+        self.bot_status_indicator.configure(text="⏳  جاري التشغيل...", text_color="#ffb300")
+        self.update()
+
         if self.on_start_callback:
             try:
                 self.on_start_callback(self.config)
                 self.is_running = True
-                self.start_btn.configure(text="⏹  إيقاف", fg_color="#c62828", hover_color="#b71c1c")
-                self.status_label.configure(text="🟢 يعمل", text_color="#66bb6a")
+                self._set_running_ui(True)
             except Exception as e:
+                self.start_btn.configure(state="normal")
+                self.bot_status_indicator.configure(text="⚫  البوت متوقف", text_color="#666666")
                 messagebox.showerror("خطأ", f"فشل التشغيل:\n{e}")
 
     def _stop_service(self):
+        if not self.is_running:
+            return
+        self.stop_btn.configure(state="disabled")
+        self.bot_status_indicator.configure(text="⏳  جاري الإيقاف...", text_color="#ffb300")
+        self.update()
         if self.on_stop_callback:
             self.on_stop_callback()
         self.is_running = False
-        self.start_btn.configure(text="▶  تشغيل", fg_color="#2e7d32", hover_color="#1b5e20")
-        self.status_label.configure(text="⭕ متوقف", text_color="#ef5350")
+        self._set_running_ui(False)
+
+    def _set_running_ui(self, running: bool):
+        if running:
+            self.start_btn.configure(state="disabled",  fg_color="#1a3a1a", border_color="#2e7d32")
+            self.stop_btn.configure( state="normal",    fg_color="#4a0000", hover_color="#c62828", border_color="#ef5350")
+            self.status_label.configure(text="🟢 يعمل", text_color="#66bb6a")
+            self.bot_status_indicator.configure(text="🟢  البوت يعمل", text_color="#66bb6a")
+        else:
+            self.start_btn.configure(state="normal",    fg_color="#1b5e20", hover_color="#2e7d32", border_color="#4caf50")
+            self.stop_btn.configure( state="disabled",  fg_color="#4a0000", border_color="#555555")
+            self.status_label.configure(text="⭕ متوقف", text_color="#ef5350")
+            self.bot_status_indicator.configure(text="⚫  البوت متوقف", text_color="#666666")
 
     def _verify_telegram(self):
         token = self.bot_token_var.get().strip()
@@ -1034,8 +1081,7 @@ class SettingsWindow(ctk.CTk):
             )
             if "python.exe" in result.stdout.lower():
                 self.is_running = True
-                self.start_btn.configure(text="⏹  إيقاف", fg_color="#c62828", hover_color="#b71c1c")
-                self.status_label.configure(text="🟢 يعمل", text_color="#66bb6a")
+                self._set_running_ui(True)
         except Exception:
             pass
 
@@ -1140,9 +1186,4 @@ class SettingsWindow(ctk.CTk):
 
     def set_running_status(self, running: bool):
         self.is_running = running
-        if running:
-            self.start_btn.configure(text="⏹  إيقاف", fg_color="#c62828", hover_color="#b71c1c")
-            self.status_label.configure(text="🟢 يعمل", text_color="#66bb6a")
-        else:
-            self.start_btn.configure(text="▶  تشغيل", fg_color="#2e7d32", hover_color="#1b5e20")
-            self.status_label.configure(text="⭕ متوقف", text_color="#ef5350")
+        self._set_running_ui(running)
