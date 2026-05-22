@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
         "openai_key": "",
         "gemini_key": "",
         "model_openai": "gpt-4o",
-        "model_gemini": "gemini-1.5-flash"
+        "model_gemini": "gemini-2.5-flash-preview-05-20"
     },
     "tunnel": {
         "provider": "cloudflare",   # cloudflare | ngrok | tailscale

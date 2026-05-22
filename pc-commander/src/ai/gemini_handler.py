@@ -1,4 +1,11 @@
-import google.generativeai as genai
+try:
+    from google import genai
+    from google.genai import types as genai_types
+    _USE_NEW_SDK = True
+except ImportError:
+    import google.generativeai as _old_genai
+    _USE_NEW_SDK = False
+
 import json
 import re
 import io
@@ -66,42 +73,88 @@ SYSTEM_PROMPT_AR = """أنت مساعد ذكاء اصطناعي متخصص في 
 
 
 class GeminiHandler:
-    def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
-        """Initialize the Gemini handler with the given API key and model."""
-        genai.configure(api_key=api_key)
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+        self.api_key = api_key
         self.model_name = model
-        self.model = genai.GenerativeModel(
-            model_name=model,
-            system_instruction=SYSTEM_PROMPT_AR
-        )
+        if _USE_NEW_SDK:
+            self.client = genai.Client(api_key=api_key)
+        else:
+            _old_genai.configure(api_key=api_key)
+            self._old_model = _old_genai.GenerativeModel(
+                model_name=model,
+                system_instruction=SYSTEM_PROMPT_AR
+            )
 
     def process_command(self, user_message: str, context: list = None) -> dict:
-        """Send user message to Gemini with conversation history and parse JSON response."""
         try:
-            history = []
-            if context:
-                for msg in context[-6:]:
-                    role = "user" if msg.get("role") == "user" else "model"
-                    history.append({"role": role, "parts": [msg.get("content", "")]})
-
-            chat = self.model.start_chat(history=history)
-            response = chat.send_message(user_message)
-            text = response.text.strip()
-            match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
-            if match:
-                text = match.group(1).strip()
+            if _USE_NEW_SDK:
+                return self._process_new_sdk(user_message, context)
             else:
-                obj_match = re.search(r'\{.*\}', text, re.DOTALL)
-                if obj_match:
-                    text = obj_match.group(0)
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return {"command": "chat", "args": [], "response": response.text}
+                return self._process_old_sdk(user_message, context)
         except Exception as e:
             return {"command": "chat", "args": [], "response": f"❌ Gemini error: {e}"}
 
+    def _process_new_sdk(self, user_message: str, context: list = None) -> dict:
+        contents = []
+        if context:
+            for msg in context[-6:]:
+                role = "user" if msg.get("role") == "user" else "model"
+                contents.append(
+                    genai_types.Content(role=role, parts=[genai_types.Part(text=msg.get("content", ""))])
+                )
+        contents.append(
+            genai_types.Content(role="user", parts=[genai_types.Part(text=user_message)])
+        )
+
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=contents,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT_AR
+            )
+        )
+        return self._parse_response(response.text)
+
+    def _process_old_sdk(self, user_message: str, context: list = None) -> dict:
+        history = []
+        if context:
+            for msg in context[-6:]:
+                role = "user" if msg.get("role") == "user" else "model"
+                history.append({"role": role, "parts": [msg.get("content", "")]})
+        chat = self._old_model.start_chat(history=history)
+        response = chat.send_message(user_message)
+        return self._parse_response(response.text)
+
+    def _parse_response(self, text: str) -> dict:
+        text = text.strip()
+        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if match:
+            text = match.group(1).strip()
+        else:
+            obj_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if obj_match:
+                text = obj_match.group(0)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return {"command": "chat", "args": [], "response": text}
+
+    def verify_key(self) -> bool:
+        try:
+            if _USE_NEW_SDK:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents="Say OK"
+                )
+                return bool(response.text)
+            else:
+                model = _old_genai.GenerativeModel(self.model_name)
+                model.generate_content("test")
+                return True
+        except Exception:
+            return False
+
     def transcribe_audio(self, audio_data: bytes, language: str = "ar") -> str:
-        """Transcribe audio bytes to text using SpeechRecognition (Google)."""
         try:
             import speech_recognition as sr
             r = sr.Recognizer()
@@ -113,7 +166,6 @@ class GeminiHandler:
             return "❌ تحويل الصوت غير متاح مع Gemini، استخدم OpenAI للصوت"
 
     def text_to_speech(self, text: str) -> bytes:
-        """Convert text to Arabic speech and return audio bytes."""
         try:
             from gtts import gTTS
             tts = gTTS(text=text, lang="ar", slow=False)
@@ -123,12 +175,3 @@ class GeminiHandler:
             return buf.read()
         except Exception:
             return None
-
-    def verify_key(self) -> bool:
-        """Verify that the configured API key is valid by sending a test prompt."""
-        try:
-            model = genai.GenerativeModel(self.model_name)
-            model.generate_content("test")
-            return True
-        except Exception:
-            return False
