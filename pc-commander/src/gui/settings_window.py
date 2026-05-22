@@ -181,9 +181,9 @@ class SettingsWindow(ctk.CTk):
                       command=lambda: self._verify_ai("gemini")).grid(row=0, column=2, padx=10, pady=8)
 
         ctk.CTkLabel(self.gemini_frame, text="النموذج:", width=140, anchor="w").grid(row=1, column=0, padx=10, pady=8)
-        self.gemini_model_var = ctk.StringVar(value="gemini-pro")
+        self.gemini_model_var = ctk.StringVar(value="gemini-2.5-flash-preview-05-20")
         ctk.CTkOptionMenu(self.gemini_frame, variable=self.gemini_model_var,
-                          values=["gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash"]).grid(row=1, column=1, padx=10, pady=8, sticky="w")
+                          values=["gemini-2.5-flash-preview-05-20", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]).grid(row=1, column=1, padx=10, pady=8, sticky="w")
 
         self.ai_status = ctk.CTkLabel(tab, text="", text_color="#aaa")
         self.ai_status.pack(pady=5)
@@ -867,6 +867,7 @@ class SettingsWindow(ctk.CTk):
         self.monitor_vars["temp_alert"].set(mon.get("temp_alert_threshold", 80))
         self._on_ai_provider_change()
         self._on_tunnel_change()
+        self._detect_running_bot()
 
     def _save_settings(self):
         users_raw = self.allowed_users_var.get().strip()
@@ -1004,10 +1005,39 @@ class SettingsWindow(ctk.CTk):
         threading.Thread(target=check, daemon=True).start()
 
     def _on_ai_provider_change(self):
-        pass
+        provider = self.ai_provider_var.get()
+        if provider == "openai":
+            self.gemini_frame.pack_forget()
+            self.openai_frame.pack(fill="x", padx=20, pady=5)
+        else:
+            self.openai_frame.pack_forget()
+            self.gemini_frame.pack(fill="x", padx=20, pady=5)
 
     def _on_tunnel_change(self):
-        pass
+        provider = self.tunnel_provider_var.get()
+        if provider == "cloudflare":
+            self.cloudflare_frame.pack(fill="x", padx=20, pady=5)
+            self.ngrok_frame.pack_forget()
+        elif provider == "ngrok":
+            self.ngrok_frame.pack(fill="x", padx=20, pady=5)
+            self.cloudflare_frame.pack_forget()
+        else:
+            self.cloudflare_frame.pack_forget()
+            self.ngrok_frame.pack_forget()
+
+    def _detect_running_bot(self):
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq python.exe", "/FO", "CSV"],
+                capture_output=True, text=True, timeout=5, creationflags=0x08000000
+            )
+            if "python.exe" in result.stdout.lower():
+                self.is_running = True
+                self.start_btn.configure(text="⏹  إيقاف", fg_color="#c62828", hover_color="#b71c1c")
+                self.status_label.configure(text="🟢 يعمل", text_color="#66bb6a")
+        except Exception:
+            pass
 
     def _browse_anydesk(self):
         path = filedialog.askopenfilename(
